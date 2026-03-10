@@ -77,18 +77,19 @@ func (s *EmployeeServer) SearchEmployees(ctx context.Context, req *pb.SearchEmpl
 func (s *EmployeeServer) GetEmployeeCredentials(ctx context.Context, req *pb.GetEmployeeCredentialsRequest) (*pb.GetEmployeeCredentialsResponse, error) {
 	var id int64
 	var passwordHash string
+	var aktivan bool
 	var dozvole pq.StringArray
 	err := s.DB.QueryRowContext(ctx,
-		`SELECT id, password, dozvole FROM employees WHERE username = $1`,
+		`SELECT id, password, aktivan, dozvole FROM employees WHERE username = $1`,
 		req.Username,
-	).Scan(&id, &passwordHash, &dozvole)
+	).Scan(&id, &passwordHash, &aktivan, &dozvole)
 	if err == sql.ErrNoRows {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetEmployeeCredentialsResponse{Id: id, PasswordHash: passwordHash, Dozvole: dozvole}, nil
+	return &pb.GetEmployeeCredentialsResponse{Id: id, PasswordHash: passwordHash, Aktivan: aktivan, Dozvole: dozvole}, nil
 }
 
 func (s *EmployeeServer) CreateEmployee(ctx context.Context, req *pb.CreateEmployeeRequest) (*pb.CreateEmployeeResponse, error) {

@@ -28,6 +28,13 @@ func (s *AuthServer) Login(ctx context.Context, req *pb_auth.LoginRequest) (*pb_
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
+	if creds.PasswordHash == "" {
+		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
+	}
+	if !creds.Aktivan {
+		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}

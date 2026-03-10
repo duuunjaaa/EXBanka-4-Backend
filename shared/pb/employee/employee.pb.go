@@ -402,6 +402,7 @@ type GetEmployeeCredentialsResponse struct {
 	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	PasswordHash  string                 `protobuf:"bytes,2,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"`
 	Dozvole       []string               `protobuf:"bytes,3,rep,name=dozvole,proto3" json:"dozvole,omitempty"`
+	Aktivan       bool                   `protobuf:"varint,4,opt,name=aktivan,proto3" json:"aktivan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -455,6 +456,13 @@ func (x *GetEmployeeCredentialsResponse) GetDozvole() []string {
 		return x.Dozvole
 	}
 	return nil
+}
+
+func (x *GetEmployeeCredentialsResponse) GetAktivan() bool {
+	if x != nil {
+		return x.Aktivan
+	}
+	return false
 }
 
 type CreateEmployeeRequest struct {
@@ -648,11 +656,12 @@ const file_employee_proto_rawDesc = "" +
 	"\x17SearchEmployeesResponse\x120\n" +
 	"\temployees\x18\x01 \x03(\v2\x12.employee.EmployeeR\temployees\";\n" +
 	"\x1dGetEmployeeCredentialsRequest\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\"o\n" +
+	"\busername\x18\x01 \x01(\tR\busername\"\x89\x01\n" +
 	"\x1eGetEmployeeCredentialsResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12#\n" +
 	"\rpassword_hash\x18\x02 \x01(\tR\fpasswordHash\x12\x18\n" +
-	"\adozvole\x18\x03 \x03(\tR\adozvole\"\xa5\x02\n" +
+	"\adozvole\x18\x03 \x03(\tR\adozvole\x12\x18\n" +
+	"\aaktivan\x18\x04 \x01(\bR\aaktivan\"\xa5\x02\n" +
 	"\x15CreateEmployeeRequest\x12\x10\n" +
 	"\x03ime\x18\x01 \x01(\tR\x03ime\x12\x18\n" +
 	"\aprezime\x18\x02 \x01(\tR\aprezime\x12%\n" +
