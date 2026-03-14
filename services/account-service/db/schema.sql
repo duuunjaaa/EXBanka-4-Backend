@@ -20,3 +20,13 @@ INSERT INTO activity_codes (code, description) VALUES
   ('86.1',  'Bolničke delatnosti'),
   ('96.0',  'Ostale lične uslužne delatnosti')
 ON CONFLICT (code) DO NOTHING;
+
+CREATE TABLE companies (
+    id                  BIGSERIAL PRIMARY KEY,
+    name                VARCHAR NOT NULL,
+    registration_number VARCHAR NOT NULL UNIQUE,
+    pib                 VARCHAR NOT NULL UNIQUE,
+    activity_code       VARCHAR REFERENCES activity_codes(code),
+    address             VARCHAR,
+    owner_client_id     BIGINT NOT NULL
+);
