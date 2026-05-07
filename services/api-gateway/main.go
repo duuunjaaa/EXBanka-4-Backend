@@ -230,21 +230,21 @@ func main() {
 	r.POST("/tax/collect", middleware.RequireRole("SUPERVISOR"), handlers.CollectTax(portfolioClient))
 	r.POST("/tax/collect/:userId", middleware.RequireRole("SUPERVISOR"), handlers.CollectTaxForUser(portfolioClient))
 	// OTC negotiations
-	r.POST("/otc/negotiations", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.CreateNegotiation(otcClient))
-	r.GET("/otc/negotiations", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.ListNegotiations(otcClient))
-	r.GET("/otc/negotiations/:id", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.GetNegotiation(otcClient))
-	r.PUT("/otc/negotiations/:id/counter", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.CounterOffer(otcClient))
-	r.PUT("/otc/negotiations/:id/accept", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.AcceptNegotiation(otcClient))
-	r.PUT("/otc/negotiations/:id/reject", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.RejectNegotiation(otcClient))
+	r.POST("/otc/negotiations", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.CreateNegotiation(otcClient))
+	r.GET("/otc/negotiations", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.ListNegotiations(otcClient))
+	r.GET("/otc/negotiations/:id", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetNegotiation(otcClient))
+	r.PUT("/otc/negotiations/:id/counter", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.CounterOffer(otcClient))
+	r.PUT("/otc/negotiations/:id/accept", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.AcceptNegotiation(otcClient))
+	r.PUT("/otc/negotiations/:id/reject", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.RejectNegotiation(otcClient))
 
 	// Investment funds
 	r.POST("/investment/funds", middleware.RequireRole("SUPERVISOR"), handlers.CreateFund(fundClient))
-	r.GET("/investment/funds", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.ListFunds(fundClient))
-	r.GET("/investment/funds/:id", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.GetFund(fundClient))
+	r.GET("/investment/funds", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.ListFunds(fundClient))
+	r.GET("/investment/funds/:id", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFund(fundClient))
 	r.PUT("/investment/funds/:id", middleware.RequireRole("SUPERVISOR"), handlers.UpdateFund(fundClient))
 	r.DELETE("/investment/funds/:id", middleware.RequireRole("SUPERVISOR"), handlers.DeleteFund(fundClient))
-	r.POST("/investment/funds/:id/invest", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.InvestFund(fundClient))
-	r.POST("/investment/funds/:id/withdraw", middleware.RequireRole("CLIENT", "EMPLOYEE"), handlers.WithdrawFund(fundClient))
+	r.POST("/investment/funds/:id/invest", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.InvestFund(fundClient))
+	r.POST("/investment/funds/:id/withdraw", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.WithdrawFund(fundClient))
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	if err := r.Run(":8083"); err != nil {
