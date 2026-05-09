@@ -136,6 +136,47 @@ func (s *PortfolioServer) SetPublicAmount(_ context.Context, _ *pb.SetPublicAmou
 	return nil, status.Error(codes.Unimplemented, "implemented in issue #147")
 }
 
+func (s *PortfolioServer) SetPublicMode(ctx context.Context, req *pb.SetPublicModeRequest) (*pb.SetPublicModeResponse, error) {
+	if req.Ticker == "" {
+		return nil, status.Error(codes.InvalidArgument, "ticker is required")
+	}
+
+	var listingID int64
+	err := s.SecuritiesDB.QueryRowContext(ctx, `SELECT id FROM listing WHERE ticker = $1`, req.Ticker).Scan(&listingID)
+	if err == sql.ErrNoRows {
+		return nil, status.Errorf(codes.NotFound, "listing not found for ticker %s", req.Ticker)
+	} else if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to resolve ticker: %v", err)
+	}
+
+	// EMPLOYEE portfolios are stored under user_id=0 (shared bank portfolio).
+	userID := req.UserId
+	if req.UserType == "EMPLOYEE" {
+		userID = 0
+	}
+
+	res, err := s.DB.ExecContext(ctx, `
+		UPDATE portfolio_entry
+		SET is_public = $1,
+		    public_amount = CASE WHEN $1 THEN amount ELSE 0 END,
+		    last_modified = NOW()
+		WHERE user_id = $2 AND user_type = $3 AND listing_id = $4`,
+		req.IsPublic, userID, req.UserType, listingID,
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update public mode: %v", err)
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		return nil, status.Error(codes.NotFound, "position not found")
+	}
+
+	return &pb.SetPublicModeResponse{
+		Ticker:   req.Ticker,
+		IsPublic: req.IsPublic,
+	}, nil
+}
+
 func (s *PortfolioServer) GetMyTax(ctx context.Context, req *pb.GetMyTaxRequest) (*pb.GetMyTaxResponse, error) {
 	userType := req.UserType
 	if userType == "" {

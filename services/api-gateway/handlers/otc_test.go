@@ -38,6 +38,9 @@ type stubOtcClient struct {
 	counterOfferFn      func(context.Context, *pb.CounterOfferRequest, ...grpc.CallOption) (*pb.NegotiationResponse, error)
 	acceptNegotiationFn func(context.Context, *pb.AcceptNegotiationRequest, ...grpc.CallOption) (*pb.NegotiationResponse, error)
 	rejectNegotiationFn func(context.Context, *pb.RejectNegotiationRequest, ...grpc.CallOption) (*pb.NegotiationResponse, error)
+	listContractsFn     func(context.Context, *pb.ListContractsRequest, ...grpc.CallOption) (*pb.ListContractsResponse, error)
+	exerciseContractFn  func(context.Context, *pb.ExerciseContractRequest, ...grpc.CallOption) (*pb.ExerciseContractResponse, error)
+	getMarketFn         func(context.Context, *pb.GetMarketRequest, ...grpc.CallOption) (*pb.GetMarketResponse, error)
 }
 
 func (s *stubOtcClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -79,6 +82,24 @@ func (s *stubOtcClient) AcceptNegotiation(ctx context.Context, in *pb.AcceptNego
 func (s *stubOtcClient) RejectNegotiation(ctx context.Context, in *pb.RejectNegotiationRequest, opts ...grpc.CallOption) (*pb.NegotiationResponse, error) {
 	if s.rejectNegotiationFn != nil {
 		return s.rejectNegotiationFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubOtcClient) ListContracts(ctx context.Context, in *pb.ListContractsRequest, opts ...grpc.CallOption) (*pb.ListContractsResponse, error) {
+	if s.listContractsFn != nil {
+		return s.listContractsFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubOtcClient) ExerciseContract(ctx context.Context, in *pb.ExerciseContractRequest, opts ...grpc.CallOption) (*pb.ExerciseContractResponse, error) {
+	if s.exerciseContractFn != nil {
+		return s.exerciseContractFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubOtcClient) GetMarket(ctx context.Context, in *pb.GetMarketRequest, opts ...grpc.CallOption) (*pb.GetMarketResponse, error) {
+	if s.getMarketFn != nil {
+		return s.getMarketFn(ctx, in, opts...)
 	}
 	return nil, fmt.Errorf("not implemented")
 }
@@ -397,5 +418,174 @@ func TestRejectNegotiation_Happy(t *testing.T) {
 	}
 	if resp["status"] != "REJECTED" {
 		t.Fatalf("expected status REJECTED got %v", resp["status"])
+	}
+}
+
+// ---- ListContracts tests ----
+
+func TestListContracts_NoToken(t *testing.T) {
+	w := serveHandler(ListContracts(&stubOtcClient{}), "GET", "/otc/contracts", "/otc/contracts", "")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", w.Code)
+	}
+}
+
+func TestListContracts_Empty(t *testing.T) {
+	svc := &stubOtcClient{
+		listContractsFn: func(_ context.Context, _ *pb.ListContractsRequest, _ ...grpc.CallOption) (*pb.ListContractsResponse, error) {
+			return &pb.ListContractsResponse{Contracts: []*pb.ContractResponse{}}, nil
+		},
+	}
+	w := serveHandlerFull(ListContracts(svc), "GET", "/otc/contracts", "/otc/contracts", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp []interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp) != 0 {
+		t.Fatalf("expected empty array got len %d", len(resp))
+	}
+}
+
+func TestListContracts_WithStatusFilter(t *testing.T) {
+	var capturedStatus string
+	svc := &stubOtcClient{
+		listContractsFn: func(_ context.Context, req *pb.ListContractsRequest, _ ...grpc.CallOption) (*pb.ListContractsResponse, error) {
+			capturedStatus = req.StatusFilter
+			return &pb.ListContractsResponse{Contracts: []*pb.ContractResponse{
+				{Id: 1, Ticker: "AAPL", Status: "ACTIVE", SettlementDate: "2026-12-31", CreatedAt: time.Now().Format(time.RFC3339)},
+			}}, nil
+		},
+	}
+	w := serveHandlerFull(ListContracts(svc), "GET", "/otc/contracts", "/otc/contracts?status=ACTIVE", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	if capturedStatus != "ACTIVE" {
+		t.Fatalf("expected StatusFilter=ACTIVE got %q", capturedStatus)
+	}
+	var resp []interface{}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp) != 1 {
+		t.Fatalf("expected 1 contract got %d", len(resp))
+	}
+}
+
+// ---- ExerciseContract tests ----
+
+func TestExerciseContract_NoToken(t *testing.T) {
+	w := serveHandler(ExerciseContract(&stubOtcClient{}), "POST", "/otc/contracts/:id/exercise", "/otc/contracts/1/exercise", "")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", w.Code)
+	}
+}
+
+func TestExerciseContract_BadID(t *testing.T) {
+	w := serveHandlerFull(ExerciseContract(&stubOtcClient{}), "POST", "/otc/contracts/:id/exercise", "/otc/contracts/abc/exercise", "", makeClientToken())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", w.Code)
+	}
+}
+
+func TestExerciseContract_NotBuyer(t *testing.T) {
+	svc := &stubOtcClient{
+		exerciseContractFn: func(_ context.Context, _ *pb.ExerciseContractRequest, _ ...grpc.CallOption) (*pb.ExerciseContractResponse, error) {
+			return nil, status.Error(codes.PermissionDenied, "only the buyer can exercise the contract")
+		},
+	}
+	w := serveHandlerFull(ExerciseContract(svc), "POST", "/otc/contracts/:id/exercise", "/otc/contracts/1/exercise", `{}`, makeClientToken())
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 got %d", w.Code)
+	}
+}
+
+func TestExerciseContract_InsufficientFunds(t *testing.T) {
+	svc := &stubOtcClient{
+		exerciseContractFn: func(_ context.Context, _ *pb.ExerciseContractRequest, _ ...grpc.CallOption) (*pb.ExerciseContractResponse, error) {
+			return nil, status.Error(codes.InvalidArgument, "Insufficient funds")
+		},
+	}
+	w := serveHandlerFull(ExerciseContract(svc), "POST", "/otc/contracts/:id/exercise", "/otc/contracts/1/exercise", `{}`, makeClientToken())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", w.Code)
+	}
+}
+
+func TestExerciseContract_Happy(t *testing.T) {
+	svc := &stubOtcClient{
+		exerciseContractFn: func(_ context.Context, req *pb.ExerciseContractRequest, _ ...grpc.CallOption) (*pb.ExerciseContractResponse, error) {
+			return &pb.ExerciseContractResponse{
+				Status:     "EXERCISED",
+				ExecutedAt: time.Now().Format(time.RFC3339),
+			}, nil
+		},
+	}
+	w := serveHandlerFull(ExerciseContract(svc), "POST", "/otc/contracts/:id/exercise", "/otc/contracts/1/exercise", `{"buyerAccountId": 100}`, makeEmployeeToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["status"] != "EXERCISED" {
+		t.Fatalf("expected status EXERCISED got %v", resp["status"])
+	}
+	if resp["executedAt"] == "" || resp["executedAt"] == nil {
+		t.Fatalf("expected non-empty executedAt")
+	}
+}
+
+// ---- GetMarket tests ----
+
+func TestGetMarket_NoToken(t *testing.T) {
+	w := serveHandler(GetMarket(&stubOtcClient{}), "GET", "/otc/market", "/otc/market", "")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", w.Code)
+	}
+}
+
+func TestGetMarket_ClientSeesOtherItems(t *testing.T) {
+	svc := &stubOtcClient{
+		getMarketFn: func(_ context.Context, req *pb.GetMarketRequest, _ ...grpc.CallOption) (*pb.GetMarketResponse, error) {
+			return &pb.GetMarketResponse{Items: []*pb.MarketItem{
+				{Ticker: "AAPL", Name: "Apple Inc", Amount: 10, PricePerStock: 150.0, Currency: "USD",
+					LastUpdated: time.Now().Format(time.RFC3339), OwnerName: "John Doe", OwnerBank: "EXBanka"},
+			}}, nil
+		},
+	}
+	w := serveHandlerFull(GetMarket(svc), "GET", "/otc/market", "/otc/market", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp []interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp) != 1 {
+		t.Fatalf("expected 1 item got %d", len(resp))
+	}
+	item := resp[0].(map[string]interface{})
+	if item["currency"] != "USD" {
+		t.Fatalf("expected currency USD got %v", item["currency"])
+	}
+}
+
+func TestGetMarket_Empty(t *testing.T) {
+	svc := &stubOtcClient{
+		getMarketFn: func(_ context.Context, _ *pb.GetMarketRequest, _ ...grpc.CallOption) (*pb.GetMarketResponse, error) {
+			return &pb.GetMarketResponse{Items: []*pb.MarketItem{}}, nil
+		},
+	}
+	w := serveHandlerFull(GetMarket(svc), "GET", "/otc/market", "/otc/market", "", makeEmployeeToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp []interface{}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp) != 0 {
+		t.Fatalf("expected empty array got %d", len(resp))
 	}
 }

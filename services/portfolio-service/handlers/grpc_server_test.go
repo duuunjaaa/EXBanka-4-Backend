@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
 )
 
 // mockSecClient implements SecurityPriceFetcher for tests.
@@ -358,4 +360,102 @@ func (m *callCountMockSecClient) GetListingById(_ context.Context, _ *pb_sec.Get
 	return &pb_sec.GetListingByIdResponse{
 		Summary: &pb_sec.ListingSummary{Price: price},
 	}, nil
+}
+
+// ── SetPublicMode ─────────────────────────────────────────────────────────────
+
+func TestSetPublicMode_MissingTicker(t *testing.T) {
+	srv, _ := newServer(t)
+	_, err := srv.SetPublicMode(context.Background(), &pb.SetPublicModeRequest{
+		UserId: 10, UserType: "CLIENT", Ticker: "", IsPublic: true,
+	})
+	require.Error(t, err)
+	assert.Equal(t, "ticker is required", statusMessage(err))
+}
+
+func TestSetPublicMode_TickerNotFound(t *testing.T) {
+	srv, _, mSec := newServerWithSecDB(t)
+	mSec.ExpectQuery("SELECT id FROM listing WHERE ticker").
+		WillReturnError(errNoRows())
+	_, err := srv.SetPublicMode(context.Background(), &pb.SetPublicModeRequest{
+		UserId: 10, UserType: "CLIENT", Ticker: "UNKNOWN", IsPublic: true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, statusMessage(err), "listing not found")
+	assert.NoError(t, mSec.ExpectationsWereMet())
+}
+
+func TestSetPublicMode_PositionNotFound(t *testing.T) {
+	srv, mDB, mSec := newServerWithSecDB(t)
+	mSec.ExpectQuery("SELECT id FROM listing WHERE ticker").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mDB.ExpectExec("UPDATE portfolio_entry").
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	_, err := srv.SetPublicMode(context.Background(), &pb.SetPublicModeRequest{
+		UserId: 10, UserType: "CLIENT", Ticker: "AAPL", IsPublic: true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, statusMessage(err), "position not found")
+	assert.NoError(t, mDB.ExpectationsWereMet())
+}
+
+func TestSetPublicMode_Enable(t *testing.T) {
+	srv, mDB, mSec := newServerWithSecDB(t)
+	mSec.ExpectQuery("SELECT id FROM listing WHERE ticker").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mDB.ExpectExec("UPDATE portfolio_entry").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	resp, err := srv.SetPublicMode(context.Background(), &pb.SetPublicModeRequest{
+		UserId: 10, UserType: "CLIENT", Ticker: "AAPL", IsPublic: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "AAPL", resp.Ticker)
+	assert.True(t, resp.IsPublic)
+	assert.NoError(t, mDB.ExpectationsWereMet())
+}
+
+func TestSetPublicMode_Disable(t *testing.T) {
+	srv, mDB, mSec := newServerWithSecDB(t)
+	mSec.ExpectQuery("SELECT id FROM listing WHERE ticker").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mDB.ExpectExec("UPDATE portfolio_entry").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	resp, err := srv.SetPublicMode(context.Background(), &pb.SetPublicModeRequest{
+		UserId: 10, UserType: "CLIENT", Ticker: "AAPL", IsPublic: false,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "AAPL", resp.Ticker)
+	assert.False(t, resp.IsPublic)
+	assert.NoError(t, mDB.ExpectationsWereMet())
+}
+
+func TestSetPublicMode_EmployeeUsesSharedUserID(t *testing.T) {
+	// EMPLOYEE portfolios are stored under user_id=0 regardless of actual employee ID.
+	// SetPublicMode must map any EMPLOYEE to user_id=0 when building the UPDATE.
+	srv, mDB, mSec := newServerWithSecDB(t)
+	mSec.ExpectQuery("SELECT id FROM listing WHERE ticker").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// WithArgs verifies that user_id=0 is used in the UPDATE, not the caller's employee ID (5).
+	mDB.ExpectExec("UPDATE portfolio_entry").
+		WithArgs(true, int64(0), "EMPLOYEE", int64(42)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	resp, err := srv.SetPublicMode(context.Background(), &pb.SetPublicModeRequest{
+		UserId: 5, UserType: "EMPLOYEE", Ticker: "AAPL", IsPublic: true,
+	})
+	require.NoError(t, err)
+	assert.True(t, resp.IsPublic)
+	assert.NoError(t, mDB.ExpectationsWereMet())
+}
+
+// statusMessage extracts the gRPC status message from an error.
+func statusMessage(err error) string {
+	return status.Convert(err).Message()
+}
+
+// errNoRows returns sql.ErrNoRows for use in mock expectations.
+func errNoRows() error {
+	return sql.ErrNoRows
 }

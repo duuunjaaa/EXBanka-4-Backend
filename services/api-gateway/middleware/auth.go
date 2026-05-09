@@ -126,6 +126,17 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 			}
 		}
 
+		// CLIENT tokens use a "role" claim instead of "dozvole".
+		if roleStr, ok := claims["role"].(string); ok {
+			roleUpper := strings.ToUpper(roleStr)
+			for _, r := range required {
+				if roleUpper == r {
+					c.Next()
+					return
+				}
+			}
+		}
+
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 	}
 }

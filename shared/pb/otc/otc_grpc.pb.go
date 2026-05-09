@@ -26,6 +26,9 @@ const (
 	OtcService_CounterOffer_FullMethodName      = "/otc.OtcService/CounterOffer"
 	OtcService_AcceptNegotiation_FullMethodName = "/otc.OtcService/AcceptNegotiation"
 	OtcService_RejectNegotiation_FullMethodName = "/otc.OtcService/RejectNegotiation"
+	OtcService_ListContracts_FullMethodName     = "/otc.OtcService/ListContracts"
+	OtcService_ExerciseContract_FullMethodName  = "/otc.OtcService/ExerciseContract"
+	OtcService_GetMarket_FullMethodName         = "/otc.OtcService/GetMarket"
 )
 
 // OtcServiceClient is the client API for OtcService service.
@@ -39,6 +42,9 @@ type OtcServiceClient interface {
 	CounterOffer(ctx context.Context, in *CounterOfferRequest, opts ...grpc.CallOption) (*NegotiationResponse, error)
 	AcceptNegotiation(ctx context.Context, in *AcceptNegotiationRequest, opts ...grpc.CallOption) (*NegotiationResponse, error)
 	RejectNegotiation(ctx context.Context, in *RejectNegotiationRequest, opts ...grpc.CallOption) (*NegotiationResponse, error)
+	ListContracts(ctx context.Context, in *ListContractsRequest, opts ...grpc.CallOption) (*ListContractsResponse, error)
+	ExerciseContract(ctx context.Context, in *ExerciseContractRequest, opts ...grpc.CallOption) (*ExerciseContractResponse, error)
+	GetMarket(ctx context.Context, in *GetMarketRequest, opts ...grpc.CallOption) (*GetMarketResponse, error)
 }
 
 type otcServiceClient struct {
@@ -119,6 +125,36 @@ func (c *otcServiceClient) RejectNegotiation(ctx context.Context, in *RejectNego
 	return out, nil
 }
 
+func (c *otcServiceClient) ListContracts(ctx context.Context, in *ListContractsRequest, opts ...grpc.CallOption) (*ListContractsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListContractsResponse)
+	err := c.cc.Invoke(ctx, OtcService_ListContracts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *otcServiceClient) ExerciseContract(ctx context.Context, in *ExerciseContractRequest, opts ...grpc.CallOption) (*ExerciseContractResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExerciseContractResponse)
+	err := c.cc.Invoke(ctx, OtcService_ExerciseContract_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *otcServiceClient) GetMarket(ctx context.Context, in *GetMarketRequest, opts ...grpc.CallOption) (*GetMarketResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMarketResponse)
+	err := c.cc.Invoke(ctx, OtcService_GetMarket_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OtcServiceServer is the server API for OtcService service.
 // All implementations must embed UnimplementedOtcServiceServer
 // for forward compatibility.
@@ -130,6 +166,9 @@ type OtcServiceServer interface {
 	CounterOffer(context.Context, *CounterOfferRequest) (*NegotiationResponse, error)
 	AcceptNegotiation(context.Context, *AcceptNegotiationRequest) (*NegotiationResponse, error)
 	RejectNegotiation(context.Context, *RejectNegotiationRequest) (*NegotiationResponse, error)
+	ListContracts(context.Context, *ListContractsRequest) (*ListContractsResponse, error)
+	ExerciseContract(context.Context, *ExerciseContractRequest) (*ExerciseContractResponse, error)
+	GetMarket(context.Context, *GetMarketRequest) (*GetMarketResponse, error)
 	mustEmbedUnimplementedOtcServiceServer()
 }
 
@@ -160,6 +199,15 @@ func (UnimplementedOtcServiceServer) AcceptNegotiation(context.Context, *AcceptN
 }
 func (UnimplementedOtcServiceServer) RejectNegotiation(context.Context, *RejectNegotiationRequest) (*NegotiationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RejectNegotiation not implemented")
+}
+func (UnimplementedOtcServiceServer) ListContracts(context.Context, *ListContractsRequest) (*ListContractsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListContracts not implemented")
+}
+func (UnimplementedOtcServiceServer) ExerciseContract(context.Context, *ExerciseContractRequest) (*ExerciseContractResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExerciseContract not implemented")
+}
+func (UnimplementedOtcServiceServer) GetMarket(context.Context, *GetMarketRequest) (*GetMarketResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMarket not implemented")
 }
 func (UnimplementedOtcServiceServer) mustEmbedUnimplementedOtcServiceServer() {}
 func (UnimplementedOtcServiceServer) testEmbeddedByValue()                    {}
@@ -308,6 +356,60 @@ func _OtcService_RejectNegotiation_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OtcService_ListContracts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListContractsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).ListContracts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_ListContracts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).ListContracts(ctx, req.(*ListContractsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OtcService_ExerciseContract_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExerciseContractRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).ExerciseContract(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_ExerciseContract_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).ExerciseContract(ctx, req.(*ExerciseContractRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OtcService_GetMarket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMarketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).GetMarket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_GetMarket_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).GetMarket(ctx, req.(*GetMarketRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OtcService_ServiceDesc is the grpc.ServiceDesc for OtcService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -342,6 +444,18 @@ var OtcService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RejectNegotiation",
 			Handler:    _OtcService_RejectNegotiation_Handler,
+		},
+		{
+			MethodName: "ListContracts",
+			Handler:    _OtcService_ListContracts_Handler,
+		},
+		{
+			MethodName: "ExerciseContract",
+			Handler:    _OtcService_ExerciseContract_Handler,
+		},
+		{
+			MethodName: "GetMarket",
+			Handler:    _OtcService_GetMarket_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

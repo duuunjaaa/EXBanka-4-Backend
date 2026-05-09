@@ -64,6 +64,9 @@ func (s *stubPortfolioClient) CollectTaxForUser(ctx context.Context, in *pb.Coll
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubPortfolioClient) SetPublicMode(ctx context.Context, in *pb.SetPublicModeRequest, opts ...grpc.CallOption) (*pb.SetPublicModeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // ---- GetPortfolio ----
 

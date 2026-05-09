@@ -23,6 +23,7 @@ const (
 	PortfolioService_GetPortfolio_FullMethodName      = "/portfolio.PortfolioService/GetPortfolio"
 	PortfolioService_GetProfit_FullMethodName         = "/portfolio.PortfolioService/GetProfit"
 	PortfolioService_SetPublicAmount_FullMethodName   = "/portfolio.PortfolioService/SetPublicAmount"
+	PortfolioService_SetPublicMode_FullMethodName     = "/portfolio.PortfolioService/SetPublicMode"
 	PortfolioService_GetMyTax_FullMethodName          = "/portfolio.PortfolioService/GetMyTax"
 	PortfolioService_GetTaxList_FullMethodName        = "/portfolio.PortfolioService/GetTaxList"
 	PortfolioService_CollectTax_FullMethodName        = "/portfolio.PortfolioService/CollectTax"
@@ -37,6 +38,7 @@ type PortfolioServiceClient interface {
 	GetPortfolio(ctx context.Context, in *GetPortfolioRequest, opts ...grpc.CallOption) (*GetPortfolioResponse, error)
 	GetProfit(ctx context.Context, in *GetProfitRequest, opts ...grpc.CallOption) (*GetProfitResponse, error)
 	SetPublicAmount(ctx context.Context, in *SetPublicAmountRequest, opts ...grpc.CallOption) (*SetPublicAmountResponse, error)
+	SetPublicMode(ctx context.Context, in *SetPublicModeRequest, opts ...grpc.CallOption) (*SetPublicModeResponse, error)
 	GetMyTax(ctx context.Context, in *GetMyTaxRequest, opts ...grpc.CallOption) (*GetMyTaxResponse, error)
 	GetTaxList(ctx context.Context, in *GetTaxListRequest, opts ...grpc.CallOption) (*GetTaxListResponse, error)
 	CollectTax(ctx context.Context, in *CollectTaxRequest, opts ...grpc.CallOption) (*CollectTaxResponse, error)
@@ -91,6 +93,16 @@ func (c *portfolioServiceClient) SetPublicAmount(ctx context.Context, in *SetPub
 	return out, nil
 }
 
+func (c *portfolioServiceClient) SetPublicMode(ctx context.Context, in *SetPublicModeRequest, opts ...grpc.CallOption) (*SetPublicModeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetPublicModeResponse)
+	err := c.cc.Invoke(ctx, PortfolioService_SetPublicMode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *portfolioServiceClient) GetMyTax(ctx context.Context, in *GetMyTaxRequest, opts ...grpc.CallOption) (*GetMyTaxResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyTaxResponse)
@@ -139,6 +151,7 @@ type PortfolioServiceServer interface {
 	GetPortfolio(context.Context, *GetPortfolioRequest) (*GetPortfolioResponse, error)
 	GetProfit(context.Context, *GetProfitRequest) (*GetProfitResponse, error)
 	SetPublicAmount(context.Context, *SetPublicAmountRequest) (*SetPublicAmountResponse, error)
+	SetPublicMode(context.Context, *SetPublicModeRequest) (*SetPublicModeResponse, error)
 	GetMyTax(context.Context, *GetMyTaxRequest) (*GetMyTaxResponse, error)
 	GetTaxList(context.Context, *GetTaxListRequest) (*GetTaxListResponse, error)
 	CollectTax(context.Context, *CollectTaxRequest) (*CollectTaxResponse, error)
@@ -164,6 +177,9 @@ func (UnimplementedPortfolioServiceServer) GetProfit(context.Context, *GetProfit
 }
 func (UnimplementedPortfolioServiceServer) SetPublicAmount(context.Context, *SetPublicAmountRequest) (*SetPublicAmountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetPublicAmount not implemented")
+}
+func (UnimplementedPortfolioServiceServer) SetPublicMode(context.Context, *SetPublicModeRequest) (*SetPublicModeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetPublicMode not implemented")
 }
 func (UnimplementedPortfolioServiceServer) GetMyTax(context.Context, *GetMyTaxRequest) (*GetMyTaxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyTax not implemented")
@@ -270,6 +286,24 @@ func _PortfolioService_SetPublicAmount_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PortfolioService_SetPublicMode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPublicModeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PortfolioServiceServer).SetPublicMode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PortfolioService_SetPublicMode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PortfolioServiceServer).SetPublicMode(ctx, req.(*SetPublicModeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PortfolioService_GetMyTax_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetMyTaxRequest)
 	if err := dec(in); err != nil {
@@ -364,6 +398,10 @@ var PortfolioService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetPublicAmount",
 			Handler:    _PortfolioService_SetPublicAmount_Handler,
+		},
+		{
+			MethodName: "SetPublicMode",
+			Handler:    _PortfolioService_SetPublicMode_Handler,
 		},
 		{
 			MethodName: "GetMyTax",

@@ -8,6 +8,7 @@ import (
 
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/otc"
+	pb_portfolio "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/portfolio"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -249,13 +250,19 @@ func AcceptNegotiation(client pb.OtcServiceClient) gin.HandlerFunc {
 			return
 		}
 
+		var body struct {
+			BuyerAccountId int64 `json:"buyerAccountId"`
+		}
+		_ = c.ShouldBindJSON(&body)
+
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 		defer cancel()
 
 		resp, err := client.AcceptNegotiation(ctx, &pb.AcceptNegotiationRequest{
-			NegotiationId: negID,
-			CallerId:      callerID,
-			CallerType:    callerType,
+			NegotiationId:  negID,
+			CallerId:       callerID,
+			CallerType:     callerType,
+			BuyerAccountId: body.BuyerAccountId,
 		})
 		if err != nil {
 			mapOtcError(c, err)
@@ -300,5 +307,183 @@ func RejectNegotiation(client pb.OtcServiceClient) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, negotiationToJSON(resp))
+	}
+}
+
+func contractToJSON(ct *pb.ContractResponse) gin.H {
+	return gin.H{
+		"id":             ct.Id,
+		"negotiationId":  ct.NegotiationId,
+		"sellerId":       ct.SellerId,
+		"sellerType":     ct.SellerType,
+		"sellerName":     ct.SellerName,
+		"buyerId":        ct.BuyerId,
+		"buyerType":      ct.BuyerType,
+		"buyerName":      ct.BuyerName,
+		"ticker":         ct.Ticker,
+		"amount":         ct.Amount,
+		"strikePrice":    ct.StrikePrice,
+		"premium":        ct.Premium,
+		"currency":       ct.Currency,
+		"settlementDate": ct.SettlementDate,
+		"status":         ct.Status,
+		"createdAt":      ct.CreatedAt,
+		"profit":         ct.Profit,
+	}
+}
+
+func ListContracts(client pb.OtcServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		callerID, err := middleware.GetUserIDFromToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "could not extract identity from token"})
+			return
+		}
+		callerType := middleware.GetCallerRoleFromToken(c)
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		resp, err := client.ListContracts(ctx, &pb.ListContractsRequest{
+			CallerId:     callerID,
+			CallerType:   callerType,
+			StatusFilter: c.Query("status"),
+		})
+		if err != nil {
+			mapOtcError(c, err)
+			return
+		}
+
+		result := make([]gin.H, 0, len(resp.Contracts))
+		for _, contract := range resp.Contracts {
+			result = append(result, contractToJSON(contract))
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func ExerciseContract(client pb.OtcServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		callerID, err := middleware.GetUserIDFromToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "could not extract identity from token"})
+			return
+		}
+		callerType := middleware.GetCallerRoleFromToken(c)
+
+		contractID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid contract id"})
+			return
+		}
+
+		var req struct {
+			BuyerAccountId int64 `json:"buyerAccountId"`
+		}
+		_ = c.ShouldBindJSON(&req)
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+		defer cancel()
+
+		resp, err := client.ExerciseContract(ctx, &pb.ExerciseContractRequest{
+			ContractId:     contractID,
+			CallerId:       callerID,
+			CallerType:     callerType,
+			BuyerAccountId: req.BuyerAccountId,
+		})
+		if err != nil {
+			mapOtcError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"status":     resp.Status,
+			"executedAt": resp.ExecutedAt,
+		})
+	}
+}
+
+func GetMarket(client pb.OtcServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		callerID, err := middleware.GetUserIDFromToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "could not extract identity from token"})
+			return
+		}
+		callerType := middleware.GetCallerRoleFromToken(c)
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		resp, err := client.GetMarket(ctx, &pb.GetMarketRequest{
+			CallerId:   callerID,
+			CallerType: callerType,
+		})
+		if err != nil {
+			mapOtcError(c, err)
+			return
+		}
+
+		result := make([]gin.H, 0, len(resp.Items))
+		for _, item := range resp.Items {
+			result = append(result, gin.H{
+				"ticker":        item.Ticker,
+				"name":          item.Name,
+				"amount":        item.Amount,
+				"pricePerStock": item.PricePerStock,
+				"currency":      item.Currency,
+				"lastUpdated":   item.LastUpdated,
+				"ownerName":     item.OwnerName,
+				"ownerBank":     item.OwnerBank,
+				"ownerId":       item.OwnerId,
+				"ownerType":     item.OwnerType,
+			})
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func SetPublicMode(portfolioClient pb_portfolio.PortfolioServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		callerID, err := middleware.GetUserIDFromToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "could not extract identity from token"})
+			return
+		}
+		callerType := middleware.GetCallerRoleFromToken(c)
+
+		ticker := c.Param("ticker")
+
+		var body struct {
+			IsPublic bool `json:"isPublic"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		resp, err := portfolioClient.SetPublicMode(ctx, &pb_portfolio.SetPublicModeRequest{
+			UserId:   callerID,
+			UserType: callerType,
+			Ticker:   ticker,
+			IsPublic: body.IsPublic,
+		})
+		if err != nil {
+			switch status.Code(err) {
+			case codes.NotFound:
+				c.JSON(http.StatusNotFound, gin.H{"error": status.Convert(err).Message()})
+			case codes.InvalidArgument:
+				c.JSON(http.StatusBadRequest, gin.H{"error": status.Convert(err).Message()})
+			default:
+				c.JSON(http.StatusInternalServerError, gin.H{"error": status.Convert(err).Message()})
+			}
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"ticker":   resp.Ticker,
+			"isPublic": resp.IsPublic,
+		})
 	}
 }

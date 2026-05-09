@@ -9,6 +9,7 @@ service PortfolioService {
   rpc GetPortfolio(GetPortfolioRequest)   returns (GetPortfolioResponse);
   rpc GetProfit(GetProfitRequest)         returns (GetProfitResponse);
   rpc SetPublicAmount(SetPublicAmountRequest) returns (SetPublicAmountResponse);
+  rpc SetPublicMode(SetPublicModeRequest) returns (SetPublicModeResponse);
   rpc GetMyTax(GetMyTaxRequest)                       returns (GetMyTaxResponse);
   rpc GetTaxList(GetTaxListRequest)                   returns (GetTaxListResponse);
   rpc CollectTax(CollectTaxRequest)                   returns (CollectTaxResponse);
@@ -67,6 +68,17 @@ message SetPublicAmountRequest {
   int32 amount     = 3;
 }
 message SetPublicAmountResponse {}
+
+message SetPublicModeRequest {
+  int64  user_id   = 1;
+  string user_type = 2;
+  string ticker    = 3;
+  bool   is_public = 4;
+}
+message SetPublicModeResponse {
+  string ticker    = 1;
+  bool   is_public = 2;
+}
 
 // Tax RPCs (#157)
 message GetMyTaxRequest {
