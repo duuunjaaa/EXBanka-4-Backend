@@ -102,4 +102,18 @@ service OrderService {
   rpc DeclineOrder        (DeclineOrderRequest)       returns (DeclineOrderResponse);
   rpc CancelOrder         (CancelOrderRequest)        returns (CancelOrderResponse);
   rpc CancelOrderPortions (CancelOrderPortionsRequest) returns (CancelOrderPortionsResponse);
+  rpc GetActuaryProfits   (GetActuaryProfitsRequest)   returns (GetActuaryProfitsResponse);
+}
+
+// ── GetActuaryProfits ─────────────────────────────────────────────────────────
+
+message GetActuaryProfitsRequest {
+  repeated int64 user_ids = 1; // empty = all EMPLOYEE orders
+}
+message ActuaryProfit {
+  int64  user_id    = 1;
+  double profit_rsd = 2;
+}
+message GetActuaryProfitsResponse {
+  repeated ActuaryProfit profits = 1;
 }

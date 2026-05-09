@@ -16,6 +16,7 @@ import (
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	pb_portfolio "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/portfolio"
 	pb_sec "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
+	"github.com/lib/pq"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	grpcstatus "google.golang.org/grpc/status"
@@ -357,4 +358,56 @@ func ordersToProto(orders []models.Order) []*pb.Order {
 		result[i] = orderToProto(o)
 	}
 	return result
+}
+
+// GetActuaryProfits returns realized P&L per actuary from completed EMPLOYEE orders (#226).
+// Profit = SUM(fill_price * qty * sign) where sign = +1 for SELL, -1 for BUY, converted to RSD.
+func (s *OrderServer) GetActuaryProfits(ctx context.Context, req *pb.GetActuaryProfitsRequest) (*pb.GetActuaryProfitsResponse, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT o.user_id, se.currency,
+		       SUM(op.price * op.quantity * CASE WHEN o.direction = 'SELL' THEN 1 ELSE -1 END) AS net_pnl
+		FROM orders o
+		JOIN order_portions op ON op.order_id = o.id
+		JOIN listing l         ON l.id         = o.asset_id
+		JOIN stock_exchanges se ON se.id        = l.exchange_id
+		WHERE o.user_type = 'EMPLOYEE'
+		  AND o.is_done   = TRUE
+		  AND (cardinality($1::bigint[]) = 0 OR o.user_id = ANY($1::bigint[]))
+		GROUP BY o.user_id, se.currency`,
+		pq.Array(req.UserIds),
+	)
+	if err != nil {
+		return nil, grpcstatus.Errorf(codes.Internal, "query actuary profits: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	// Accumulate per-user profit in RSD (one row per user+currency combination).
+	profitMap := make(map[int64]float64)
+	for rows.Next() {
+		var userID int64
+		var currency string
+		var netPnl float64
+		if err := rows.Scan(&userID, &currency, &netPnl); err != nil {
+			return nil, grpcstatus.Errorf(codes.Internal, "scan actuary profit row: %v", err)
+		}
+
+		amountRSD := netPnl
+		if currency != "RSD" {
+			var sellingRate float64
+			dbErr := s.ExchangeDB.QueryRowContext(ctx,
+				`SELECT selling_rate FROM daily_exchange_rates WHERE currency_code = $1 AND date = CURRENT_DATE`,
+				currency,
+			).Scan(&sellingRate)
+			if dbErr == nil && sellingRate > 0 {
+				amountRSD = netPnl * sellingRate
+			}
+		}
+		profitMap[userID] += amountRSD
+	}
+
+	profits := make([]*pb.ActuaryProfit, 0, len(profitMap))
+	for userID, profitRSD := range profitMap {
+		profits = append(profits, &pb.ActuaryProfit{UserId: userID, ProfitRsd: profitRSD})
+	}
+	return &pb.GetActuaryProfitsResponse{Profits: profits}, nil
 }

@@ -435,3 +435,70 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 func isUniqueViolation(err error) bool {
 	return strings.Contains(err.Error(), "23505") || strings.Contains(err.Error(), "unique constraint")
 }
+
+// GetBankPositions returns all investment fund positions held by the bank (client_type='BANK', client_id=0).
+// Used by the bank profit portal (#234).
+func (s *FundServer) GetBankPositions(ctx context.Context, _ *pb.GetBankPositionsRequest) (*pb.GetBankPositionsResponse, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT cfp.fund_id,
+		       cfp.total_invested_amount                                         AS bank_invested,
+		       f.name,
+		       f.liquid_assets                                                   AS fund_value,
+		       f.manager_id,
+		       COALESCE((SELECT SUM(total_invested_amount)
+		                 FROM client_fund_positions
+		                 WHERE fund_id = cfp.fund_id), 0)                        AS total_all_invested
+		FROM client_fund_positions cfp
+		JOIN investment_funds f ON f.id = cfp.fund_id
+		WHERE cfp.client_type = 'BANK'
+		  AND cfp.client_id   = 0
+		  AND f.active        = TRUE`)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get bank positions: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var positions []*pb.BankFundPosition
+	for rows.Next() {
+		var (
+			fundID           int64
+			bankInvested     float64
+			fundName         string
+			fundValue        float64
+			managerID        int64
+			totalAllInvested float64
+		)
+		if err := rows.Scan(&fundID, &bankInvested, &fundName, &fundValue, &managerID, &totalAllInvested); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan bank position: %v", err)
+		}
+
+		var bankShareRSD float64
+		if totalAllInvested > 0 {
+			bankShareRSD = (bankInvested / totalAllInvested) * fundValue
+		}
+		var bankSharePercent float64
+		if fundValue > 0 {
+			bankSharePercent = (bankShareRSD / fundValue) * 100
+		}
+
+		var managerName string
+		if managerID != 0 {
+			_ = s.EmployeeDB.QueryRowContext(ctx,
+				`SELECT first_name || ' ' || last_name FROM employees WHERE id = $1`, managerID,
+			).Scan(&managerName)
+		}
+
+		positions = append(positions, &pb.BankFundPosition{
+			FundId:           fundID,
+			FundName:         fundName,
+			ManagerName:      managerName,
+			BankSharePercent: bankSharePercent,
+			BankShareRsd:     bankShareRSD,
+			ProfitRsd:        bankShareRSD - bankInvested,
+		})
+	}
+	if positions == nil {
+		positions = []*pb.BankFundPosition{}
+	}
+	return &pb.GetBankPositionsResponse{Positions: positions}, nil
+}

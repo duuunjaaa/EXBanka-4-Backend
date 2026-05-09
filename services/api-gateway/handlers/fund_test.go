@@ -89,6 +89,9 @@ func (s *stubFundClient) WithdrawFund(ctx context.Context, in *pb.WithdrawFundRe
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubFundClient) GetBankPositions(ctx context.Context, in *pb.GetBankPositionsRequest, opts ...grpc.CallOption) (*pb.GetBankPositionsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // sampleFund returns a sample FundResponse.
 func sampleFund() *pb.FundResponse {

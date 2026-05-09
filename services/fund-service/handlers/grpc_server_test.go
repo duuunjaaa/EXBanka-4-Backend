@@ -507,3 +507,69 @@ func TestDeleteFund_CountDBError(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }
+
+// ── GetBankPositions ──────────────────────────────────────────────────────────
+
+func TestGetBankPositions_Empty(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT cfp\.fund_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"fund_id", "bank_invested", "name", "fund_value", "manager_id", "total_all_invested"}))
+
+	resp, err := s.GetBankPositions(context.Background(), &pb.GetBankPositionsRequest{})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Positions)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetBankPositions_Happy(t *testing.T) {
+	// Bank invested 1000, total all invested 4000, fund value 8000.
+	// bankShareRSD = (1000/4000)*8000 = 2000
+	// bankSharePercent = (2000/8000)*100 = 25%
+	// profitRSD = 2000 - 1000 = 1000
+	s, fundMock, _, empMock := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT cfp\.fund_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"fund_id", "bank_invested", "name", "fund_value", "manager_id", "total_all_invested"}).
+			AddRow(int64(1), 1000.0, "RAF Growth Fund", 8000.0, int64(5), 4000.0))
+	empMock.ExpectQuery(`SELECT first_name`).
+		WillReturnRows(sqlmock.NewRows([]string{"manager_name"}).AddRow("Ana Jovanovic"))
+
+	resp, err := s.GetBankPositions(context.Background(), &pb.GetBankPositionsRequest{})
+	require.NoError(t, err)
+	require.Len(t, resp.Positions, 1)
+	pos := resp.Positions[0]
+	assert.Equal(t, int64(1), pos.FundId)
+	assert.Equal(t, "RAF Growth Fund", pos.FundName)
+	assert.Equal(t, "Ana Jovanovic", pos.ManagerName)
+	assert.InDelta(t, 25.0, pos.BankSharePercent, 0.01)
+	assert.InDelta(t, 2000.0, pos.BankShareRsd, 0.01)
+	assert.InDelta(t, 1000.0, pos.ProfitRsd, 0.01)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetBankPositions_ZeroFundValue(t *testing.T) {
+	// Fund has no value yet — bankSharePercent should be 0, not divide-by-zero.
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT cfp\.fund_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"fund_id", "bank_invested", "name", "fund_value", "manager_id", "total_all_invested"}).
+			AddRow(int64(2), 500.0, "Empty Fund", 0.0, int64(0), 500.0))
+
+	resp, err := s.GetBankPositions(context.Background(), &pb.GetBankPositionsRequest{})
+	require.NoError(t, err)
+	require.Len(t, resp.Positions, 1)
+	assert.InDelta(t, 0.0, resp.Positions[0].BankSharePercent, 0.001)
+	assert.InDelta(t, 0.0, resp.Positions[0].BankShareRsd, 0.001)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetBankPositions_DBError(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT cfp\.fund_id`).WillReturnError(sql.ErrConnDone)
+
+	_, err := s.GetBankPositions(context.Background(), &pb.GetBankPositionsRequest{})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}

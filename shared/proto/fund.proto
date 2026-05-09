@@ -11,6 +11,7 @@ service FundService {
   rpc DeleteFund(DeleteFundRequest) returns (DeleteFundResponse);
   rpc InvestFund(InvestFundRequest) returns (FundResponse);
   rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
+  rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
 }
 
 message PingRequest {}
@@ -80,4 +81,19 @@ message WithdrawFundRequest {
   string client_type            = 3;
   int64  destination_account_id = 4;
   double amount                 = 5; // 0 = full position
+}
+
+// ── GetBankPositions ──────────────────────────────────────────────────────────
+
+message BankFundPosition {
+  int64  fund_id            = 1;
+  string fund_name          = 2;
+  string manager_name       = 3;
+  double bank_share_percent = 4;
+  double bank_share_rsd     = 5;
+  double profit_rsd         = 6;
+}
+message GetBankPositionsRequest {}
+message GetBankPositionsResponse {
+  repeated BankFundPosition positions = 1;
 }

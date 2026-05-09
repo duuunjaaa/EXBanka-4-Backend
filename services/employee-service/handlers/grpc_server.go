@@ -493,3 +493,31 @@ func (s *EmployeeServer) ResetAllActuaryUsedLimits(ctx context.Context, _ *pb.Re
 	}
 	return &pb.ResetAllActuaryUsedLimitsResponse{}, nil
 }
+
+// GetActuaryPerformers returns all employees with AGENT, SUPERVISOR, or ADMIN permission.
+// Used by the bank profit portal to show per-actuary realized P&L (#226).
+func (s *EmployeeServer) GetActuaryPerformers(ctx context.Context, _ *pb.GetActuaryPerformersRequest) (*pb.GetActuaryPerformersResponse, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT id, first_name, last_name, position
+		FROM employees
+		WHERE ('AGENT' = ANY(permissions) OR 'SUPERVISOR' = ANY(permissions) OR 'ADMIN' = ANY(permissions))
+		  AND active = TRUE
+		ORDER BY last_name, first_name`)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get actuary performers: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var performers []*pb.ActuaryPerformer
+	for rows.Next() {
+		var p pb.ActuaryPerformer
+		if err := rows.Scan(&p.UserId, &p.FirstName, &p.LastName, &p.Position); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan actuary performer: %v", err)
+		}
+		performers = append(performers, &p)
+	}
+	if performers == nil {
+		performers = []*pb.ActuaryPerformer{}
+	}
+	return &pb.GetActuaryPerformersResponse{Performers: performers}, nil
+}

@@ -1009,6 +1009,146 @@ func (*CancelOrderPortionsResponse) Descriptor() ([]byte, []int) {
 	return file_order_proto_rawDescGZIP(), []int{16}
 }
 
+type GetActuaryProfitsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserIds       []int64                `protobuf:"varint,1,rep,packed,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"` // empty = all EMPLOYEE orders
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActuaryProfitsRequest) Reset() {
+	*x = GetActuaryProfitsRequest{}
+	mi := &file_order_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActuaryProfitsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActuaryProfitsRequest) ProtoMessage() {}
+
+func (x *GetActuaryProfitsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_order_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActuaryProfitsRequest.ProtoReflect.Descriptor instead.
+func (*GetActuaryProfitsRequest) Descriptor() ([]byte, []int) {
+	return file_order_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetActuaryProfitsRequest) GetUserIds() []int64 {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+type ActuaryProfit struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProfitRsd     float64                `protobuf:"fixed64,2,opt,name=profit_rsd,json=profitRsd,proto3" json:"profit_rsd,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActuaryProfit) Reset() {
+	*x = ActuaryProfit{}
+	mi := &file_order_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActuaryProfit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActuaryProfit) ProtoMessage() {}
+
+func (x *ActuaryProfit) ProtoReflect() protoreflect.Message {
+	mi := &file_order_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActuaryProfit.ProtoReflect.Descriptor instead.
+func (*ActuaryProfit) Descriptor() ([]byte, []int) {
+	return file_order_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ActuaryProfit) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *ActuaryProfit) GetProfitRsd() float64 {
+	if x != nil {
+		return x.ProfitRsd
+	}
+	return 0
+}
+
+type GetActuaryProfitsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profits       []*ActuaryProfit       `protobuf:"bytes,1,rep,name=profits,proto3" json:"profits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActuaryProfitsResponse) Reset() {
+	*x = GetActuaryProfitsResponse{}
+	mi := &file_order_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActuaryProfitsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActuaryProfitsResponse) ProtoMessage() {}
+
+func (x *GetActuaryProfitsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_order_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActuaryProfitsResponse.ProtoReflect.Descriptor instead.
+func (*GetActuaryProfitsResponse) Descriptor() ([]byte, []int) {
+	return file_order_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetActuaryProfitsResponse) GetProfits() []*ActuaryProfit {
+	if x != nil {
+		return x.Profits
+	}
+	return nil
+}
+
 var File_order_proto protoreflect.FileDescriptor
 
 const file_order_proto_rawDesc = "" +
@@ -1089,7 +1229,15 @@ const file_order_proto_rawDesc = "" +
 	"\x1aCancelOrderPortionsRequest\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\x03R\aorderId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\"\x1d\n" +
-	"\x1bCancelOrderPortionsResponse2\xc7\x04\n" +
+	"\x1bCancelOrderPortionsResponse\"5\n" +
+	"\x18GetActuaryProfitsRequest\x12\x19\n" +
+	"\buser_ids\x18\x01 \x03(\x03R\auserIds\"G\n" +
+	"\rActuaryProfit\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1d\n" +
+	"\n" +
+	"profit_rsd\x18\x02 \x01(\x01R\tprofitRsd\"K\n" +
+	"\x19GetActuaryProfitsResponse\x12.\n" +
+	"\aprofits\x18\x01 \x03(\v2\x14.order.ActuaryProfitR\aprofits2\x9f\x05\n" +
 	"\fOrderService\x12/\n" +
 	"\x04Ping\x12\x12.order.PingRequest\x1a\x13.order.PingResponse\x12D\n" +
 	"\vCreateOrder\x12\x19.order.CreateOrderRequest\x1a\x1a.order.CreateOrderResponse\x12A\n" +
@@ -1099,7 +1247,8 @@ const file_order_proto_rawDesc = "" +
 	"\fApproveOrder\x12\x1a.order.ApproveOrderRequest\x1a\x1b.order.ApproveOrderResponse\x12G\n" +
 	"\fDeclineOrder\x12\x1a.order.DeclineOrderRequest\x1a\x1b.order.DeclineOrderResponse\x12D\n" +
 	"\vCancelOrder\x12\x19.order.CancelOrderRequest\x1a\x1a.order.CancelOrderResponse\x12\\\n" +
-	"\x13CancelOrderPortions\x12!.order.CancelOrderPortionsRequest\x1a\".order.CancelOrderPortionsResponseB:Z8github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/orderb\x06proto3"
+	"\x13CancelOrderPortions\x12!.order.CancelOrderPortionsRequest\x1a\".order.CancelOrderPortionsResponse\x12V\n" +
+	"\x11GetActuaryProfits\x12\x1f.order.GetActuaryProfitsRequest\x1a .order.GetActuaryProfitsResponseB:Z8github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/orderb\x06proto3"
 
 var (
 	file_order_proto_rawDescOnce sync.Once
@@ -1113,7 +1262,7 @@ func file_order_proto_rawDescGZIP() []byte {
 	return file_order_proto_rawDescData
 }
 
-var file_order_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_order_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_order_proto_goTypes = []any{
 	(*PingRequest)(nil),                 // 0: order.PingRequest
 	(*PingResponse)(nil),                // 1: order.PingResponse
@@ -1132,31 +1281,37 @@ var file_order_proto_goTypes = []any{
 	(*CancelOrderResponse)(nil),         // 14: order.CancelOrderResponse
 	(*CancelOrderPortionsRequest)(nil),  // 15: order.CancelOrderPortionsRequest
 	(*CancelOrderPortionsResponse)(nil), // 16: order.CancelOrderPortionsResponse
+	(*GetActuaryProfitsRequest)(nil),    // 17: order.GetActuaryProfitsRequest
+	(*ActuaryProfit)(nil),               // 18: order.ActuaryProfit
+	(*GetActuaryProfitsResponse)(nil),   // 19: order.GetActuaryProfitsResponse
 }
 var file_order_proto_depIdxs = []int32{
 	2,  // 0: order.ListOrdersResponse.orders:type_name -> order.Order
 	2,  // 1: order.GetOrderByIdResponse.order:type_name -> order.Order
-	0,  // 2: order.OrderService.Ping:input_type -> order.PingRequest
-	3,  // 3: order.OrderService.CreateOrder:input_type -> order.CreateOrderRequest
-	5,  // 4: order.OrderService.ListOrders:input_type -> order.ListOrdersRequest
-	7,  // 5: order.OrderService.GetOrderById:input_type -> order.GetOrderByIdRequest
-	9,  // 6: order.OrderService.ApproveOrder:input_type -> order.ApproveOrderRequest
-	11, // 7: order.OrderService.DeclineOrder:input_type -> order.DeclineOrderRequest
-	13, // 8: order.OrderService.CancelOrder:input_type -> order.CancelOrderRequest
-	15, // 9: order.OrderService.CancelOrderPortions:input_type -> order.CancelOrderPortionsRequest
-	1,  // 10: order.OrderService.Ping:output_type -> order.PingResponse
-	4,  // 11: order.OrderService.CreateOrder:output_type -> order.CreateOrderResponse
-	6,  // 12: order.OrderService.ListOrders:output_type -> order.ListOrdersResponse
-	8,  // 13: order.OrderService.GetOrderById:output_type -> order.GetOrderByIdResponse
-	10, // 14: order.OrderService.ApproveOrder:output_type -> order.ApproveOrderResponse
-	12, // 15: order.OrderService.DeclineOrder:output_type -> order.DeclineOrderResponse
-	14, // 16: order.OrderService.CancelOrder:output_type -> order.CancelOrderResponse
-	16, // 17: order.OrderService.CancelOrderPortions:output_type -> order.CancelOrderPortionsResponse
-	10, // [10:18] is the sub-list for method output_type
-	2,  // [2:10] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	18, // 2: order.GetActuaryProfitsResponse.profits:type_name -> order.ActuaryProfit
+	0,  // 3: order.OrderService.Ping:input_type -> order.PingRequest
+	3,  // 4: order.OrderService.CreateOrder:input_type -> order.CreateOrderRequest
+	5,  // 5: order.OrderService.ListOrders:input_type -> order.ListOrdersRequest
+	7,  // 6: order.OrderService.GetOrderById:input_type -> order.GetOrderByIdRequest
+	9,  // 7: order.OrderService.ApproveOrder:input_type -> order.ApproveOrderRequest
+	11, // 8: order.OrderService.DeclineOrder:input_type -> order.DeclineOrderRequest
+	13, // 9: order.OrderService.CancelOrder:input_type -> order.CancelOrderRequest
+	15, // 10: order.OrderService.CancelOrderPortions:input_type -> order.CancelOrderPortionsRequest
+	17, // 11: order.OrderService.GetActuaryProfits:input_type -> order.GetActuaryProfitsRequest
+	1,  // 12: order.OrderService.Ping:output_type -> order.PingResponse
+	4,  // 13: order.OrderService.CreateOrder:output_type -> order.CreateOrderResponse
+	6,  // 14: order.OrderService.ListOrders:output_type -> order.ListOrdersResponse
+	8,  // 15: order.OrderService.GetOrderById:output_type -> order.GetOrderByIdResponse
+	10, // 16: order.OrderService.ApproveOrder:output_type -> order.ApproveOrderResponse
+	12, // 17: order.OrderService.DeclineOrder:output_type -> order.DeclineOrderResponse
+	14, // 18: order.OrderService.CancelOrder:output_type -> order.CancelOrderResponse
+	16, // 19: order.OrderService.CancelOrderPortions:output_type -> order.CancelOrderPortionsResponse
+	19, // 20: order.OrderService.GetActuaryProfits:output_type -> order.GetActuaryProfitsResponse
+	12, // [12:21] is the sub-list for method output_type
+	3,  // [3:12] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_order_proto_init() }
@@ -1170,7 +1325,7 @@ func file_order_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_order_proto_rawDesc), len(file_order_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

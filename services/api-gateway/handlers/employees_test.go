@@ -112,6 +112,9 @@ func (s *stubEmpClient) ResetAllActuaryUsedLimits(ctx context.Context, in *pb.Re
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubEmpClient) GetActuaryPerformers(ctx context.Context, in *pb.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb.GetActuaryPerformersResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // ---- stub auth client ----
 

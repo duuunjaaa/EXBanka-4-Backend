@@ -27,6 +27,7 @@ const (
 	OrderService_DeclineOrder_FullMethodName        = "/order.OrderService/DeclineOrder"
 	OrderService_CancelOrder_FullMethodName         = "/order.OrderService/CancelOrder"
 	OrderService_CancelOrderPortions_FullMethodName = "/order.OrderService/CancelOrderPortions"
+	OrderService_GetActuaryProfits_FullMethodName   = "/order.OrderService/GetActuaryProfits"
 )
 
 // OrderServiceClient is the client API for OrderService service.
@@ -41,6 +42,7 @@ type OrderServiceClient interface {
 	DeclineOrder(ctx context.Context, in *DeclineOrderRequest, opts ...grpc.CallOption) (*DeclineOrderResponse, error)
 	CancelOrder(ctx context.Context, in *CancelOrderRequest, opts ...grpc.CallOption) (*CancelOrderResponse, error)
 	CancelOrderPortions(ctx context.Context, in *CancelOrderPortionsRequest, opts ...grpc.CallOption) (*CancelOrderPortionsResponse, error)
+	GetActuaryProfits(ctx context.Context, in *GetActuaryProfitsRequest, opts ...grpc.CallOption) (*GetActuaryProfitsResponse, error)
 }
 
 type orderServiceClient struct {
@@ -131,6 +133,16 @@ func (c *orderServiceClient) CancelOrderPortions(ctx context.Context, in *Cancel
 	return out, nil
 }
 
+func (c *orderServiceClient) GetActuaryProfits(ctx context.Context, in *GetActuaryProfitsRequest, opts ...grpc.CallOption) (*GetActuaryProfitsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetActuaryProfitsResponse)
+	err := c.cc.Invoke(ctx, OrderService_GetActuaryProfits_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrderServiceServer is the server API for OrderService service.
 // All implementations must embed UnimplementedOrderServiceServer
 // for forward compatibility.
@@ -143,6 +155,7 @@ type OrderServiceServer interface {
 	DeclineOrder(context.Context, *DeclineOrderRequest) (*DeclineOrderResponse, error)
 	CancelOrder(context.Context, *CancelOrderRequest) (*CancelOrderResponse, error)
 	CancelOrderPortions(context.Context, *CancelOrderPortionsRequest) (*CancelOrderPortionsResponse, error)
+	GetActuaryProfits(context.Context, *GetActuaryProfitsRequest) (*GetActuaryProfitsResponse, error)
 	mustEmbedUnimplementedOrderServiceServer()
 }
 
@@ -176,6 +189,9 @@ func (UnimplementedOrderServiceServer) CancelOrder(context.Context, *CancelOrder
 }
 func (UnimplementedOrderServiceServer) CancelOrderPortions(context.Context, *CancelOrderPortionsRequest) (*CancelOrderPortionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelOrderPortions not implemented")
+}
+func (UnimplementedOrderServiceServer) GetActuaryProfits(context.Context, *GetActuaryProfitsRequest) (*GetActuaryProfitsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetActuaryProfits not implemented")
 }
 func (UnimplementedOrderServiceServer) mustEmbedUnimplementedOrderServiceServer() {}
 func (UnimplementedOrderServiceServer) testEmbeddedByValue()                      {}
@@ -342,6 +358,24 @@ func _OrderService_CancelOrderPortions_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrderService_GetActuaryProfits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActuaryProfitsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrderServiceServer).GetActuaryProfits(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrderService_GetActuaryProfits_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrderServiceServer).GetActuaryProfits(ctx, req.(*GetActuaryProfitsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrderService_ServiceDesc is the grpc.ServiceDesc for OrderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +414,10 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelOrderPortions",
 			Handler:    _OrderService_CancelOrderPortions_Handler,
+		},
+		{
+			MethodName: "GetActuaryProfits",
+			Handler:    _OrderService_GetActuaryProfits_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

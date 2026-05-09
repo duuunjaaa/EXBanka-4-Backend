@@ -335,3 +335,130 @@ func WithdrawFund(client pb.FundServiceClient) gin.HandlerFunc {
 		c.JSON(http.StatusOK, fundToJSON(resp))
 	}
 }
+
+// GetBankFundPositions godoc
+// @Summary      Bank profit portal — bank's fund positions
+// @Description  Returns all investment fund positions held by the bank, with share % and profit. SUPERVISOR only.
+// @Tags         bank-profit
+// @Produce      json
+// @Success      200  {array}   object
+// @Failure      500  {object}  map[string]string
+// @Security     BearerAuth
+// @Router       /bank/profit/fund-positions [get]
+func GetBankFundPositions(client pb.FundServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		resp, err := client.GetBankPositions(ctx, &pb.GetBankPositionsRequest{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		result := make([]gin.H, 0, len(resp.Positions))
+		for _, p := range resp.Positions {
+			result = append(result, gin.H{
+				"fundId":           p.FundId,
+				"fundName":         p.FundName,
+				"managerName":      p.ManagerName,
+				"bankSharePercent": p.BankSharePercent,
+				"bankShareRSD":     p.BankShareRsd,
+				"profitRSD":        p.ProfitRsd,
+			})
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+// BankInvestFund godoc
+// @Summary      Bank profit portal — bank invests in a fund
+// @Description  Invests bank money into the specified fund. SUPERVISOR only. sourceAccountId must be a bank account.
+// @Tags         bank-profit
+// @Accept       json
+// @Produce      json
+// @Param        fundId  path      int     true  "Fund ID"
+// @Param        body    body      object  true  "amount and sourceAccountId"
+// @Success      200  {object}  object
+// @Failure      400  {object}  map[string]string
+// @Security     BearerAuth
+// @Router       /bank/profit/fund-positions/{fundId}/invest [post]
+func BankInvestFund(client pb.FundServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		fundID, err := strconv.ParseInt(c.Param("fundId"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid fundId"})
+			return
+		}
+		var req struct {
+			Amount          float64 `json:"amount"          binding:"required"`
+			SourceAccountId int64   `json:"sourceAccountId" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+		defer cancel()
+
+		resp, err := client.InvestFund(ctx, &pb.InvestFundRequest{
+			FundId:          fundID,
+			ClientId:        0,
+			ClientType:      "BANK",
+			SourceAccountId: req.SourceAccountId,
+			Amount:          req.Amount,
+		})
+		if err != nil {
+			mapFundError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, fundToJSON(resp))
+	}
+}
+
+// BankRedeemFund godoc
+// @Summary      Bank profit portal — bank redeems from a fund
+// @Description  Redeems bank investment from the specified fund. SUPERVISOR only.
+// @Tags         bank-profit
+// @Accept       json
+// @Produce      json
+// @Param        fundId  path      int     true  "Fund ID"
+// @Param        body    body      object  true  "amount and destinationAccountId"
+// @Success      200  {object}  object
+// @Failure      400  {object}  map[string]string
+// @Security     BearerAuth
+// @Router       /bank/profit/fund-positions/{fundId}/redeem [post]
+func BankRedeemFund(client pb.FundServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		fundID, err := strconv.ParseInt(c.Param("fundId"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid fundId"})
+			return
+		}
+		var req struct {
+			Amount               float64 `json:"amount"               binding:"required"`
+			DestinationAccountId int64   `json:"destinationAccountId" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+		defer cancel()
+
+		resp, err := client.WithdrawFund(ctx, &pb.WithdrawFundRequest{
+			FundId:               fundID,
+			ClientId:             0,
+			ClientType:           "BANK",
+			DestinationAccountId: req.DestinationAccountId,
+			Amount:               req.Amount,
+		})
+		if err != nil {
+			mapFundError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, fundToJSON(resp))
+	}
+}

@@ -168,6 +168,19 @@ message SetNeedApprovalResponse {}
 message ResetAllActuaryUsedLimitsRequest {}
 message ResetAllActuaryUsedLimitsResponse {}
 
+// Bank profit portal — actuary performance list (#226)
+
+message ActuaryPerformer {
+  int64  user_id    = 1;
+  string first_name = 2;
+  string last_name  = 3;
+  string position   = 4;
+}
+message GetActuaryPerformersRequest {}
+message GetActuaryPerformersResponse {
+  repeated ActuaryPerformer performers = 1;
+}
+
 service EmployeeService {
   rpc GetAllEmployees(GetAllEmployeesRequest) returns (GetAllEmployeesResponse);
   rpc SearchEmployees(SearchEmployeesRequest) returns (SearchEmployeesResponse);
@@ -183,4 +196,5 @@ service EmployeeService {
   rpc ResetAgentUsedLimit(ResetAgentUsedLimitRequest) returns (ResetAgentUsedLimitResponse);
   rpc SetNeedApproval(SetNeedApprovalRequest) returns (SetNeedApprovalResponse);
   rpc ResetAllActuaryUsedLimits(ResetAllActuaryUsedLimitsRequest) returns (ResetAllActuaryUsedLimitsResponse);
+  rpc GetActuaryPerformers(GetActuaryPerformersRequest) returns (GetActuaryPerformersResponse);
 }

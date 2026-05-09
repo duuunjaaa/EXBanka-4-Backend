@@ -71,6 +71,9 @@ func (s *stubOrderClient) CancelOrderPortions(ctx context.Context, in *pb.Cancel
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubOrderClient) GetActuaryProfits(_ context.Context, _ *pb.GetActuaryProfitsRequest, _ ...grpc.CallOption) (*pb.GetActuaryProfitsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // ---- stub employee client ----
 
@@ -116,6 +119,9 @@ func (s *stubEmployeeClient) SetNeedApproval(_ context.Context, _ *pb_emp.SetNee
 	return nil, nil
 }
 func (s *stubEmployeeClient) ResetAllActuaryUsedLimits(_ context.Context, _ *pb_emp.ResetAllActuaryUsedLimitsRequest, _ ...grpc.CallOption) (*pb_emp.ResetAllActuaryUsedLimitsResponse, error) {
+	return nil, nil
+}
+func (s *stubEmployeeClient) GetActuaryPerformers(_ context.Context, _ *pb_emp.GetActuaryPerformersRequest, _ ...grpc.CallOption) (*pb_emp.GetActuaryPerformersResponse, error) {
 	return nil, nil
 }
 

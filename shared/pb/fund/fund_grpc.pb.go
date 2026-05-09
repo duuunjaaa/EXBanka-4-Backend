@@ -19,14 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FundService_Ping_FullMethodName         = "/fund.FundService/Ping"
-	FundService_CreateFund_FullMethodName   = "/fund.FundService/CreateFund"
-	FundService_ListFunds_FullMethodName    = "/fund.FundService/ListFunds"
-	FundService_GetFund_FullMethodName      = "/fund.FundService/GetFund"
-	FundService_UpdateFund_FullMethodName   = "/fund.FundService/UpdateFund"
-	FundService_DeleteFund_FullMethodName   = "/fund.FundService/DeleteFund"
-	FundService_InvestFund_FullMethodName   = "/fund.FundService/InvestFund"
-	FundService_WithdrawFund_FullMethodName = "/fund.FundService/WithdrawFund"
+	FundService_Ping_FullMethodName             = "/fund.FundService/Ping"
+	FundService_CreateFund_FullMethodName       = "/fund.FundService/CreateFund"
+	FundService_ListFunds_FullMethodName        = "/fund.FundService/ListFunds"
+	FundService_GetFund_FullMethodName          = "/fund.FundService/GetFund"
+	FundService_UpdateFund_FullMethodName       = "/fund.FundService/UpdateFund"
+	FundService_DeleteFund_FullMethodName       = "/fund.FundService/DeleteFund"
+	FundService_InvestFund_FullMethodName       = "/fund.FundService/InvestFund"
+	FundService_WithdrawFund_FullMethodName     = "/fund.FundService/WithdrawFund"
+	FundService_GetBankPositions_FullMethodName = "/fund.FundService/GetBankPositions"
 )
 
 // FundServiceClient is the client API for FundService service.
@@ -41,6 +42,7 @@ type FundServiceClient interface {
 	DeleteFund(ctx context.Context, in *DeleteFundRequest, opts ...grpc.CallOption) (*DeleteFundResponse, error)
 	InvestFund(ctx context.Context, in *InvestFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
 	WithdrawFund(ctx context.Context, in *WithdrawFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
+	GetBankPositions(ctx context.Context, in *GetBankPositionsRequest, opts ...grpc.CallOption) (*GetBankPositionsResponse, error)
 }
 
 type fundServiceClient struct {
@@ -131,6 +133,16 @@ func (c *fundServiceClient) WithdrawFund(ctx context.Context, in *WithdrawFundRe
 	return out, nil
 }
 
+func (c *fundServiceClient) GetBankPositions(ctx context.Context, in *GetBankPositionsRequest, opts ...grpc.CallOption) (*GetBankPositionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBankPositionsResponse)
+	err := c.cc.Invoke(ctx, FundService_GetBankPositions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FundServiceServer is the server API for FundService service.
 // All implementations must embed UnimplementedFundServiceServer
 // for forward compatibility.
@@ -143,6 +155,7 @@ type FundServiceServer interface {
 	DeleteFund(context.Context, *DeleteFundRequest) (*DeleteFundResponse, error)
 	InvestFund(context.Context, *InvestFundRequest) (*FundResponse, error)
 	WithdrawFund(context.Context, *WithdrawFundRequest) (*FundResponse, error)
+	GetBankPositions(context.Context, *GetBankPositionsRequest) (*GetBankPositionsResponse, error)
 	mustEmbedUnimplementedFundServiceServer()
 }
 
@@ -176,6 +189,9 @@ func (UnimplementedFundServiceServer) InvestFund(context.Context, *InvestFundReq
 }
 func (UnimplementedFundServiceServer) WithdrawFund(context.Context, *WithdrawFundRequest) (*FundResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method WithdrawFund not implemented")
+}
+func (UnimplementedFundServiceServer) GetBankPositions(context.Context, *GetBankPositionsRequest) (*GetBankPositionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetBankPositions not implemented")
 }
 func (UnimplementedFundServiceServer) mustEmbedUnimplementedFundServiceServer() {}
 func (UnimplementedFundServiceServer) testEmbeddedByValue()                     {}
@@ -342,6 +358,24 @@ func _FundService_WithdrawFund_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FundService_GetBankPositions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBankPositionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FundServiceServer).GetBankPositions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FundService_GetBankPositions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FundServiceServer).GetBankPositions(ctx, req.(*GetBankPositionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FundService_ServiceDesc is the grpc.ServiceDesc for FundService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +414,10 @@ var FundService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WithdrawFund",
 			Handler:    _FundService_WithdrawFund_Handler,
+		},
+		{
+			MethodName: "GetBankPositions",
+			Handler:    _FundService_GetBankPositions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
