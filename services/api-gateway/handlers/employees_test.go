@@ -41,6 +41,7 @@ type stubEmpClient struct {
 	resetUsedLimitFn            func(context.Context, *pb.ResetAgentUsedLimitRequest, ...grpc.CallOption) (*pb.ResetAgentUsedLimitResponse, error)
 	setNeedApprovalFn           func(context.Context, *pb.SetNeedApprovalRequest, ...grpc.CallOption) (*pb.SetNeedApprovalResponse, error)
 	resetAllActuaryUsedLimitsFn func(context.Context, *pb.ResetAllActuaryUsedLimitsRequest, ...grpc.CallOption) (*pb.ResetAllActuaryUsedLimitsResponse, error)
+	getActuaryPerformersFn      func(context.Context, *pb.GetActuaryPerformersRequest, ...grpc.CallOption) (*pb.GetActuaryPerformersResponse, error)
 }
 
 func (s *stubEmpClient) GetAllEmployees(ctx context.Context, in *pb.GetAllEmployeesRequest, opts ...grpc.CallOption) (*pb.GetAllEmployeesResponse, error) {
@@ -113,6 +114,9 @@ func (s *stubEmpClient) ResetAllActuaryUsedLimits(ctx context.Context, in *pb.Re
 	return nil, fmt.Errorf("not implemented")
 }
 func (s *stubEmpClient) GetActuaryPerformers(ctx context.Context, in *pb.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb.GetActuaryPerformersResponse, error) {
+	if s.getActuaryPerformersFn != nil {
+		return s.getActuaryPerformersFn(ctx, in, opts...)
+	}
 	return nil, fmt.Errorf("not implemented")
 }
 

@@ -37,8 +37,9 @@ type stubFundClient struct {
 	getFundFn      func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
 	updateFundFn   func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
 	deleteFundFn   func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
-	investFundFn   func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	withdrawFundFn func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	investFundFn       func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	withdrawFundFn     func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	getBankPositionsFn func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -90,6 +91,9 @@ func (s *stubFundClient) WithdrawFund(ctx context.Context, in *pb.WithdrawFundRe
 	return nil, fmt.Errorf("not implemented")
 }
 func (s *stubFundClient) GetBankPositions(ctx context.Context, in *pb.GetBankPositionsRequest, opts ...grpc.CallOption) (*pb.GetBankPositionsResponse, error) {
+	if s.getBankPositionsFn != nil {
+		return s.getBankPositionsFn(ctx, in, opts...)
+	}
 	return nil, fmt.Errorf("not implemented")
 }
 

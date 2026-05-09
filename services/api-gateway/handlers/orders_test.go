@@ -23,7 +23,8 @@ type stubOrderClient struct {
 	approveOrderFn   func(context.Context, *pb.ApproveOrderRequest, ...grpc.CallOption) (*pb.ApproveOrderResponse, error)
 	declineOrderFn   func(context.Context, *pb.DeclineOrderRequest, ...grpc.CallOption) (*pb.DeclineOrderResponse, error)
 	cancelOrderFn    func(context.Context, *pb.CancelOrderRequest, ...grpc.CallOption) (*pb.CancelOrderResponse, error)
-	cancelPortionsFn func(context.Context, *pb.CancelOrderPortionsRequest, ...grpc.CallOption) (*pb.CancelOrderPortionsResponse, error)
+	cancelPortionsFn    func(context.Context, *pb.CancelOrderPortionsRequest, ...grpc.CallOption) (*pb.CancelOrderPortionsResponse, error)
+	getActuaryProfitsFn func(context.Context, *pb.GetActuaryProfitsRequest, ...grpc.CallOption) (*pb.GetActuaryProfitsResponse, error)
 }
 
 func (s *stubOrderClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -71,7 +72,10 @@ func (s *stubOrderClient) CancelOrderPortions(ctx context.Context, in *pb.Cancel
 	}
 	return nil, fmt.Errorf("not implemented")
 }
-func (s *stubOrderClient) GetActuaryProfits(_ context.Context, _ *pb.GetActuaryProfitsRequest, _ ...grpc.CallOption) (*pb.GetActuaryProfitsResponse, error) {
+func (s *stubOrderClient) GetActuaryProfits(ctx context.Context, in *pb.GetActuaryProfitsRequest, opts ...grpc.CallOption) (*pb.GetActuaryProfitsResponse, error) {
+	if s.getActuaryProfitsFn != nil {
+		return s.getActuaryProfitsFn(ctx, in, opts...)
+	}
 	return nil, fmt.Errorf("not implemented")
 }
 
