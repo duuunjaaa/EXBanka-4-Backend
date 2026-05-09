@@ -992,36 +992,43 @@ func TestCancelOrderPortions_NotFound(t *testing.T) {
 
 // ── GetActuaryProfits ─────────────────────────────────────────────────────────
 
-func newOrderServerWithExchangeDB(t *testing.T) (*handlers.OrderServer, sqlmock.Sqlmock, sqlmock.Sqlmock) {
+func newOrderServerWithExchangeDB(t *testing.T) (*handlers.OrderServer, sqlmock.Sqlmock, sqlmock.Sqlmock, sqlmock.Sqlmock) {
 	t.Helper()
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
+	secDB, secMock, err := sqlmock.New()
+	require.NoError(t, err)
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	srv := &handlers.OrderServer{DB: db, ExchangeDB: exchDB}
-	t.Cleanup(func() { _ = db.Close(); _ = exchDB.Close() })
-	return srv, dbMock, exchMock
+	srv := &handlers.OrderServer{DB: db, SecuritiesDB: secDB, ExchangeDB: exchDB}
+	t.Cleanup(func() { _ = db.Close(); _ = secDB.Close(); _ = exchDB.Close() })
+	return srv, dbMock, secMock, exchMock
 }
 
 func TestGetActuaryProfits_NoOrders(t *testing.T) {
-	srv, dbMock, _ := newOrderServerWithExchangeDB(t)
+	srv, dbMock, secMock, _ := newOrderServerWithExchangeDB(t)
 
-	dbMock.ExpectQuery(`SELECT o\.user_id, se\.currency`).
-		WillReturnRows(sqlmock.NewRows([]string{"user_id", "currency", "net_pnl"}))
+	dbMock.ExpectQuery(`SELECT o\.user_id, o\.asset_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "asset_id", "net_pnl"}))
 
 	resp, err := srv.GetActuaryProfits(context.Background(), &pb.GetActuaryProfitsRequest{UserIds: []int64{1, 2}})
 	require.NoError(t, err)
 	assert.Empty(t, resp.Profits)
 	require.NoError(t, dbMock.ExpectationsWereMet())
+	require.NoError(t, secMock.ExpectationsWereMet())
 }
 
 func TestGetActuaryProfits_RSDProfit(t *testing.T) {
-	srv, dbMock, _ := newOrderServerWithExchangeDB(t)
+	srv, dbMock, secMock, _ := newOrderServerWithExchangeDB(t)
 
-	rows := sqlmock.NewRows([]string{"user_id", "currency", "net_pnl"}).
-		AddRow(int64(1), "RSD", 300.0).
-		AddRow(int64(2), "RSD", 1000.0)
-	dbMock.ExpectQuery(`SELECT o\.user_id, se\.currency`).WillReturnRows(rows)
+	// Two rows for two users, both using asset_id=10 (RSD exchange)
+	rows := sqlmock.NewRows([]string{"user_id", "asset_id", "net_pnl"}).
+		AddRow(int64(1), int64(10), 300.0).
+		AddRow(int64(2), int64(10), 1000.0)
+	dbMock.ExpectQuery(`SELECT o\.user_id, o\.asset_id`).WillReturnRows(rows)
+	// SecuritiesDB: currency lookup for asset 10 → RSD (queried once because asset 10 is unique)
+	secMock.ExpectQuery(`SELECT e\.currency FROM listing`).WithArgs(int64(10)).
+		WillReturnRows(sqlmock.NewRows([]string{"currency"}).AddRow("RSD"))
 
 	resp, err := srv.GetActuaryProfits(context.Background(), &pb.GetActuaryProfitsRequest{UserIds: []int64{1, 2}})
 	require.NoError(t, err)
@@ -1034,14 +1041,17 @@ func TestGetActuaryProfits_RSDProfit(t *testing.T) {
 	assert.InDelta(t, 300.0, profitMap[1], 0.01)
 	assert.InDelta(t, 1000.0, profitMap[2], 0.01)
 	require.NoError(t, dbMock.ExpectationsWereMet())
+	require.NoError(t, secMock.ExpectationsWereMet())
 }
 
 func TestGetActuaryProfits_USDConversion(t *testing.T) {
-	srv, dbMock, exchMock := newOrderServerWithExchangeDB(t)
+	srv, dbMock, secMock, exchMock := newOrderServerWithExchangeDB(t)
 
-	rows := sqlmock.NewRows([]string{"user_id", "currency", "net_pnl"}).
-		AddRow(int64(1), "USD", 100.0)
-	dbMock.ExpectQuery(`SELECT o\.user_id, se\.currency`).WillReturnRows(rows)
+	rows := sqlmock.NewRows([]string{"user_id", "asset_id", "net_pnl"}).
+		AddRow(int64(1), int64(20), 100.0)
+	dbMock.ExpectQuery(`SELECT o\.user_id, o\.asset_id`).WillReturnRows(rows)
+	secMock.ExpectQuery(`SELECT e\.currency FROM listing`).WithArgs(int64(20)).
+		WillReturnRows(sqlmock.NewRows([]string{"currency"}).AddRow("USD"))
 	exchMock.ExpectQuery(`SELECT selling_rate FROM daily_exchange_rates`).
 		WillReturnRows(sqlmock.NewRows([]string{"selling_rate"}).AddRow(117.0))
 
@@ -1050,13 +1060,14 @@ func TestGetActuaryProfits_USDConversion(t *testing.T) {
 	require.Len(t, resp.Profits, 1)
 	assert.InDelta(t, 11700.0, resp.Profits[0].ProfitRsd, 0.01)
 	require.NoError(t, dbMock.ExpectationsWereMet())
+	require.NoError(t, secMock.ExpectationsWereMet())
 	require.NoError(t, exchMock.ExpectationsWereMet())
 }
 
 func TestGetActuaryProfits_DBError(t *testing.T) {
-	srv, dbMock, _ := newOrderServerWithExchangeDB(t)
+	srv, dbMock, _, _ := newOrderServerWithExchangeDB(t)
 
-	dbMock.ExpectQuery(`SELECT o\.user_id, se\.currency`).WillReturnError(sql.ErrConnDone)
+	dbMock.ExpectQuery(`SELECT o\.user_id, o\.asset_id`).WillReturnError(sql.ErrConnDone)
 
 	_, err := srv.GetActuaryProfits(context.Background(), &pb.GetActuaryProfitsRequest{})
 	require.Error(t, err)

@@ -362,18 +362,19 @@ func ordersToProto(orders []models.Order) []*pb.Order {
 
 // GetActuaryProfits returns realized P&L per actuary from completed EMPLOYEE orders (#226).
 // Profit = SUM(fill_price * qty * sign) where sign = +1 for SELL, -1 for BUY, converted to RSD.
+// Two-step: (1) aggregate per (user_id, asset_id) from order DB; (2) look up currency from
+// SecuritiesDB (listing + stock_exchanges live there, not in the order DB).
 func (s *OrderServer) GetActuaryProfits(ctx context.Context, req *pb.GetActuaryProfitsRequest) (*pb.GetActuaryProfitsResponse, error) {
+	// Step 1: net P&L per (user_id, asset_id) from order-service DB.
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT o.user_id, se.currency,
+		SELECT o.user_id, o.asset_id,
 		       SUM(op.price * op.quantity * CASE WHEN o.direction = 'SELL' THEN 1 ELSE -1 END) AS net_pnl
 		FROM orders o
 		JOIN order_portions op ON op.order_id = o.id
-		JOIN listing l         ON l.id         = o.asset_id
-		JOIN stock_exchanges se ON se.id        = l.exchange_id
 		WHERE o.user_type = 'EMPLOYEE'
 		  AND o.is_done   = TRUE
 		  AND (cardinality($1::bigint[]) = 0 OR o.user_id = ANY($1::bigint[]))
-		GROUP BY o.user_id, se.currency`,
+		GROUP BY o.user_id, o.asset_id`,
 		pq.Array(req.UserIds),
 	)
 	if err != nil {
@@ -381,28 +382,63 @@ func (s *OrderServer) GetActuaryProfits(ctx context.Context, req *pb.GetActuaryP
 	}
 	defer func() { _ = rows.Close() }()
 
-	// Accumulate per-user profit in RSD (one row per user+currency combination).
-	profitMap := make(map[int64]float64)
+	type pnlRow struct {
+		userID  int64
+		assetID int64
+		netPnl  float64
+	}
+	var pnlRows []pnlRow
+	assetIDs := make(map[int64]struct{})
 	for rows.Next() {
-		var userID int64
-		var currency string
-		var netPnl float64
-		if err := rows.Scan(&userID, &currency, &netPnl); err != nil {
+		var r pnlRow
+		if err := rows.Scan(&r.userID, &r.assetID, &r.netPnl); err != nil {
 			return nil, grpcstatus.Errorf(codes.Internal, "scan actuary profit row: %v", err)
 		}
+		pnlRows = append(pnlRows, r)
+		assetIDs[r.assetID] = struct{}{}
+	}
 
-		amountRSD := netPnl
-		if currency != "RSD" {
-			var sellingRate float64
-			dbErr := s.ExchangeDB.QueryRowContext(ctx,
-				`SELECT selling_rate FROM daily_exchange_rates WHERE currency_code = $1 AND date = CURRENT_DATE`,
-				currency,
-			).Scan(&sellingRate)
-			if dbErr == nil && sellingRate > 0 {
-				amountRSD = netPnl * sellingRate
+	// Step 2: resolve currency per asset from SecuritiesDB (same pattern as CreateOrder).
+	assetCurrency := make(map[int64]string, len(assetIDs))
+	for assetID := range assetIDs {
+		var currency string
+		if err := s.SecuritiesDB.QueryRowContext(ctx,
+			`SELECT e.currency FROM listing l JOIN stock_exchanges e ON e.id = l.exchange_id WHERE l.id = $1`,
+			assetID,
+		).Scan(&currency); err == nil {
+			assetCurrency[assetID] = currency
+		}
+	}
+
+	// Step 3: fetch exchange rates for non-RSD currencies (cached to avoid duplicate queries).
+	rateCache := make(map[string]float64)
+	for _, currency := range assetCurrency {
+		if currency == "" || currency == "RSD" {
+			continue
+		}
+		if _, cached := rateCache[currency]; cached {
+			continue
+		}
+		var rate float64
+		if err := s.ExchangeDB.QueryRowContext(ctx,
+			`SELECT selling_rate FROM daily_exchange_rates WHERE currency_code = $1 AND date = CURRENT_DATE`,
+			currency,
+		).Scan(&rate); err == nil && rate > 0 {
+			rateCache[currency] = rate
+		}
+	}
+
+	// Step 4: accumulate profit in RSD per user.
+	profitMap := make(map[int64]float64)
+	for _, r := range pnlRows {
+		currency := assetCurrency[r.assetID]
+		amountRSD := r.netPnl
+		if currency != "" && currency != "RSD" {
+			if rate, ok := rateCache[currency]; ok {
+				amountRSD = r.netPnl * rate
 			}
 		}
-		profitMap[userID] += amountRSD
+		profitMap[r.userID] += amountRSD
 	}
 
 	profits := make([]*pb.ActuaryProfit, 0, len(profitMap))
