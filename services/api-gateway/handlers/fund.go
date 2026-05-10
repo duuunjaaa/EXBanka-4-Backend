@@ -747,3 +747,37 @@ func GetMyPositions(client pb.FundServiceClient) gin.HandlerFunc {
 		c.JSON(http.StatusOK, result)
 	}
 }
+
+func GetFundPerformanceHistory(client pb.FundServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid fund id"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetFundPerformanceHistory(ctx, &pb.GetFundPerformanceRequest{
+			FundId: id,
+			From:   c.Query("from"),
+			To:     c.Query("to"),
+		})
+		if err != nil {
+			mapFundError(c, err)
+			return
+		}
+
+		type record struct {
+			Date      string  `json:"date"`
+			FundValue float64 `json:"fundValue"`
+			Profit    float64 `json:"profit"`
+		}
+		out := make([]record, len(resp.Records))
+		for i, r := range resp.Records {
+			out[i] = record{Date: r.Date, FundValue: r.FundValue, Profit: r.Profit}
+		}
+		c.JSON(http.StatusOK, out)
+	}
+}

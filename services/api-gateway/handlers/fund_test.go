@@ -33,21 +33,22 @@ func makeSupervisorToken() string {
 // ---- stub fund client ----
 
 type stubFundClient struct {
-	pingFn                    func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
-	createFundFn              func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	listFundsFn               func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
-	getFundFn                 func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	updateFundFn              func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	deleteFundFn              func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
-	investFundFn              func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	withdrawFundFn            func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.WithdrawFundResponse, error)
-	checkPendingWithdrawalsFn func(context.Context, *pb.CheckPendingWithdrawalsRequest, ...grpc.CallOption) (*pb.CheckPendingWithdrawalsResponse, error)
-	getBankPositionsFn        func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
-	validateFundAccountFn     func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
-	updateFundHoldingFn       func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
-	getMyPositionsFn          func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
-	transferFundsByManagerFn  func(context.Context, *pb.TransferFundsByManagerRequest, ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error)
-	getFundPortfolioFn        func(context.Context, *pb.GetFundPortfolioRequest, ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error)
+	pingFn                      func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
+	createFundFn                func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	listFundsFn                 func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
+	getFundFn                   func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	updateFundFn                func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	deleteFundFn                func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
+	investFundFn                func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	withdrawFundFn              func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.WithdrawFundResponse, error)
+	checkPendingWithdrawalsFn   func(context.Context, *pb.CheckPendingWithdrawalsRequest, ...grpc.CallOption) (*pb.CheckPendingWithdrawalsResponse, error)
+	getBankPositionsFn          func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
+	validateFundAccountFn       func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
+	updateFundHoldingFn         func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
+	getMyPositionsFn            func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
+	transferFundsByManagerFn    func(context.Context, *pb.TransferFundsByManagerRequest, ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error)
+	getFundPortfolioFn          func(context.Context, *pb.GetFundPortfolioRequest, ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error)
+	getFundPerformanceHistoryFn func(context.Context, *pb.GetFundPerformanceRequest, ...grpc.CallOption) (*pb.GetFundPerformanceResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -139,6 +140,12 @@ func (s *stubFundClient) GetFundPortfolio(ctx context.Context, in *pb.GetFundPor
 		return s.getFundPortfolioFn(ctx, in, opts...)
 	}
 	return &pb.GetFundPortfolioResponse{}, nil
+}
+func (s *stubFundClient) GetFundPerformanceHistory(ctx context.Context, in *pb.GetFundPerformanceRequest, opts ...grpc.CallOption) (*pb.GetFundPerformanceResponse, error) {
+	if s.getFundPerformanceHistoryFn != nil {
+		return s.getFundPerformanceHistoryFn(ctx, in, opts...)
+	}
+	return &pb.GetFundPerformanceResponse{}, nil
 }
 
 // sampleFund returns a sample FundResponse.
@@ -762,5 +769,66 @@ func TestWithdrawFund_WithdrawAll_SendsZeroAmount(t *testing.T) {
 	}
 	if capturedAmount != 0 {
 		t.Fatalf("expected amount=0 for withdrawAll, got %v", capturedAmount)
+	}
+}
+
+// ── GetFundPerformanceHistory ──────────────────────────────────────────────────
+
+func TestGetFundPerformanceHistory_Happy(t *testing.T) {
+	svc := &stubFundClient{
+		getFundPerformanceHistoryFn: func(_ context.Context, _ *pb.GetFundPerformanceRequest, _ ...grpc.CallOption) (*pb.GetFundPerformanceResponse, error) {
+			return &pb.GetFundPerformanceResponse{
+				Records: []*pb.PerformanceRecord{
+					{Date: "2025-01-01", FundValue: 100000.0, Profit: 5000.0},
+					{Date: "2025-01-02", FundValue: 102000.0, Profit: 7000.0},
+				},
+			}, nil
+		},
+	}
+	w := serveHandlerFull(GetFundPerformanceHistory(svc), "GET", "/investment/funds/:id/performance", "/investment/funds/1/performance?from=2025-01-01&to=2025-01-02", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+	var result []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(result))
+	}
+	if result[0]["date"] != "2025-01-01" {
+		t.Errorf("expected date 2025-01-01, got %v", result[0]["date"])
+	}
+	if result[0]["fundValue"].(float64) != 100000.0 {
+		t.Errorf("unexpected fundValue: %v", result[0]["fundValue"])
+	}
+	if result[0]["profit"].(float64) != 5000.0 {
+		t.Errorf("unexpected profit: %v", result[0]["profit"])
+	}
+}
+
+func TestGetFundPerformanceHistory_Empty(t *testing.T) {
+	svc := &stubFundClient{
+		getFundPerformanceHistoryFn: func(_ context.Context, _ *pb.GetFundPerformanceRequest, _ ...grpc.CallOption) (*pb.GetFundPerformanceResponse, error) {
+			return &pb.GetFundPerformanceResponse{Records: []*pb.PerformanceRecord{}}, nil
+		},
+	}
+	w := serveHandlerFull(GetFundPerformanceHistory(svc), "GET", "/investment/funds/:id/performance", "/investment/funds/1/performance", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+	var result []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("expected empty slice, got %d items", len(result))
+	}
+}
+
+func TestGetFundPerformanceHistory_BadId(t *testing.T) {
+	w := serveHandlerFull(GetFundPerformanceHistory(&stubFundClient{}), "GET", "/investment/funds/:id/performance", "/investment/funds/abc/performance", "", makeClientToken())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", w.Code)
 	}
 }

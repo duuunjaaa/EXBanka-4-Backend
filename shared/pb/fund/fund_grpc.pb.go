@@ -19,21 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FundService_Ping_FullMethodName                    = "/fund.FundService/Ping"
-	FundService_CreateFund_FullMethodName              = "/fund.FundService/CreateFund"
-	FundService_ListFunds_FullMethodName               = "/fund.FundService/ListFunds"
-	FundService_GetFund_FullMethodName                 = "/fund.FundService/GetFund"
-	FundService_UpdateFund_FullMethodName              = "/fund.FundService/UpdateFund"
-	FundService_DeleteFund_FullMethodName              = "/fund.FundService/DeleteFund"
-	FundService_InvestFund_FullMethodName              = "/fund.FundService/InvestFund"
-	FundService_WithdrawFund_FullMethodName            = "/fund.FundService/WithdrawFund"
-	FundService_CheckPendingWithdrawals_FullMethodName = "/fund.FundService/CheckPendingWithdrawals"
-	FundService_GetBankPositions_FullMethodName        = "/fund.FundService/GetBankPositions"
-	FundService_GetMyPositions_FullMethodName          = "/fund.FundService/GetMyPositions"
-	FundService_TransferFundsByManager_FullMethodName  = "/fund.FundService/TransferFundsByManager"
-	FundService_ValidateFundAccount_FullMethodName     = "/fund.FundService/ValidateFundAccount"
-	FundService_UpdateFundHolding_FullMethodName       = "/fund.FundService/UpdateFundHolding"
-	FundService_GetFundPortfolio_FullMethodName        = "/fund.FundService/GetFundPortfolio"
+	FundService_Ping_FullMethodName                      = "/fund.FundService/Ping"
+	FundService_CreateFund_FullMethodName                = "/fund.FundService/CreateFund"
+	FundService_ListFunds_FullMethodName                 = "/fund.FundService/ListFunds"
+	FundService_GetFund_FullMethodName                   = "/fund.FundService/GetFund"
+	FundService_UpdateFund_FullMethodName                = "/fund.FundService/UpdateFund"
+	FundService_DeleteFund_FullMethodName                = "/fund.FundService/DeleteFund"
+	FundService_InvestFund_FullMethodName                = "/fund.FundService/InvestFund"
+	FundService_WithdrawFund_FullMethodName              = "/fund.FundService/WithdrawFund"
+	FundService_CheckPendingWithdrawals_FullMethodName   = "/fund.FundService/CheckPendingWithdrawals"
+	FundService_GetBankPositions_FullMethodName          = "/fund.FundService/GetBankPositions"
+	FundService_GetMyPositions_FullMethodName            = "/fund.FundService/GetMyPositions"
+	FundService_TransferFundsByManager_FullMethodName    = "/fund.FundService/TransferFundsByManager"
+	FundService_ValidateFundAccount_FullMethodName       = "/fund.FundService/ValidateFundAccount"
+	FundService_UpdateFundHolding_FullMethodName         = "/fund.FundService/UpdateFundHolding"
+	FundService_GetFundPortfolio_FullMethodName          = "/fund.FundService/GetFundPortfolio"
+	FundService_GetFundPerformanceHistory_FullMethodName = "/fund.FundService/GetFundPerformanceHistory"
 )
 
 // FundServiceClient is the client API for FundService service.
@@ -55,6 +56,7 @@ type FundServiceClient interface {
 	ValidateFundAccount(ctx context.Context, in *ValidateFundAccountRequest, opts ...grpc.CallOption) (*ValidateFundAccountResponse, error)
 	UpdateFundHolding(ctx context.Context, in *UpdateFundHoldingRequest, opts ...grpc.CallOption) (*UpdateFundHoldingResponse, error)
 	GetFundPortfolio(ctx context.Context, in *GetFundPortfolioRequest, opts ...grpc.CallOption) (*GetFundPortfolioResponse, error)
+	GetFundPerformanceHistory(ctx context.Context, in *GetFundPerformanceRequest, opts ...grpc.CallOption) (*GetFundPerformanceResponse, error)
 }
 
 type fundServiceClient struct {
@@ -215,6 +217,16 @@ func (c *fundServiceClient) GetFundPortfolio(ctx context.Context, in *GetFundPor
 	return out, nil
 }
 
+func (c *fundServiceClient) GetFundPerformanceHistory(ctx context.Context, in *GetFundPerformanceRequest, opts ...grpc.CallOption) (*GetFundPerformanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFundPerformanceResponse)
+	err := c.cc.Invoke(ctx, FundService_GetFundPerformanceHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FundServiceServer is the server API for FundService service.
 // All implementations must embed UnimplementedFundServiceServer
 // for forward compatibility.
@@ -234,6 +246,7 @@ type FundServiceServer interface {
 	ValidateFundAccount(context.Context, *ValidateFundAccountRequest) (*ValidateFundAccountResponse, error)
 	UpdateFundHolding(context.Context, *UpdateFundHoldingRequest) (*UpdateFundHoldingResponse, error)
 	GetFundPortfolio(context.Context, *GetFundPortfolioRequest) (*GetFundPortfolioResponse, error)
+	GetFundPerformanceHistory(context.Context, *GetFundPerformanceRequest) (*GetFundPerformanceResponse, error)
 	mustEmbedUnimplementedFundServiceServer()
 }
 
@@ -288,6 +301,9 @@ func (UnimplementedFundServiceServer) UpdateFundHolding(context.Context, *Update
 }
 func (UnimplementedFundServiceServer) GetFundPortfolio(context.Context, *GetFundPortfolioRequest) (*GetFundPortfolioResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFundPortfolio not implemented")
+}
+func (UnimplementedFundServiceServer) GetFundPerformanceHistory(context.Context, *GetFundPerformanceRequest) (*GetFundPerformanceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFundPerformanceHistory not implemented")
 }
 func (UnimplementedFundServiceServer) mustEmbedUnimplementedFundServiceServer() {}
 func (UnimplementedFundServiceServer) testEmbeddedByValue()                     {}
@@ -580,6 +596,24 @@ func _FundService_GetFundPortfolio_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FundService_GetFundPerformanceHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFundPerformanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FundServiceServer).GetFundPerformanceHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FundService_GetFundPerformanceHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FundServiceServer).GetFundPerformanceHistory(ctx, req.(*GetFundPerformanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FundService_ServiceDesc is the grpc.ServiceDesc for FundService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -646,6 +680,10 @@ var FundService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFundPortfolio",
 			Handler:    _FundService_GetFundPortfolio_Handler,
+		},
+		{
+			MethodName: "GetFundPerformanceHistory",
+			Handler:    _FundService_GetFundPerformanceHistory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

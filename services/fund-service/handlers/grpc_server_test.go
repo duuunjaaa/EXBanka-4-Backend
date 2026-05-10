@@ -1022,3 +1022,55 @@ func TestCheckPendingWithdrawals_StillInsufficient(t *testing.T) {
 	assert.Equal(t, int64(0), resp.Completed)
 	require.NoError(t, fundMock.ExpectationsWereMet())
 }
+
+// ── GetFundPerformanceHistory ─────────────────────────────────────────────────
+
+func TestGetFundPerformanceHistory_Happy(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT TO_CHAR\(date, 'YYYY-MM-DD'\), fund_value, profit`).
+		WithArgs(int64(1), "2025-01-01", "2025-01-31").
+		WillReturnRows(sqlmock.NewRows([]string{"date", "fund_value", "profit"}).
+			AddRow("2025-01-01", 100000.0, 5000.0).
+			AddRow("2025-01-15", 102000.0, 7000.0))
+
+	resp, err := s.GetFundPerformanceHistory(context.Background(), &pb.GetFundPerformanceRequest{
+		FundId: 1, From: "2025-01-01", To: "2025-01-31",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Records, 2)
+	assert.Equal(t, "2025-01-01", resp.Records[0].Date)
+	assert.InDelta(t, 100000.0, resp.Records[0].FundValue, 0.01)
+	assert.InDelta(t, 5000.0, resp.Records[0].Profit, 0.01)
+	assert.Equal(t, "2025-01-15", resp.Records[1].Date)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetFundPerformanceHistory_Empty(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT TO_CHAR\(date, 'YYYY-MM-DD'\), fund_value, profit`).
+		WithArgs(int64(1), "2025-01-01", "2025-01-31").
+		WillReturnRows(sqlmock.NewRows([]string{"date", "fund_value", "profit"}))
+
+	resp, err := s.GetFundPerformanceHistory(context.Background(), &pb.GetFundPerformanceRequest{
+		FundId: 1, From: "2025-01-01", To: "2025-01-31",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Records)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetFundPerformanceHistory_DBError(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery(`SELECT TO_CHAR\(date, 'YYYY-MM-DD'\), fund_value, profit`).
+		WithArgs(int64(1), "2025-01-01", "2025-01-31").
+		WillReturnError(fmt.Errorf("db down"))
+
+	_, err := s.GetFundPerformanceHistory(context.Background(), &pb.GetFundPerformanceRequest{
+		FundId: 1, From: "2025-01-01", To: "2025-01-31",
+	})
+	require.Error(t, err)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
