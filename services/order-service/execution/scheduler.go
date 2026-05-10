@@ -244,6 +244,13 @@ func (s *Scheduler) executeOrder(order models.Order) {
 				log.Printf("order-scheduler: set done error for order %d: %v", order.ID, err)
 			}
 			log.Printf("order-scheduler: order %d fully executed", order.ID)
+			if order.FundID != 0 && order.Direction == "SELL" && s.FundClient != nil {
+				if _, err := s.FundClient.CheckPendingWithdrawals(ctx, &pb_fund.CheckPendingWithdrawalsRequest{
+					FundId: order.FundID,
+				}); err != nil {
+					log.Printf("order-scheduler: CheckPendingWithdrawals for fund %d error: %v", order.FundID, err)
+				}
+			}
 			return
 		}
 

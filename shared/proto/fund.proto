@@ -10,11 +10,14 @@ service FundService {
   rpc UpdateFund(UpdateFundRequest) returns (FundResponse);
   rpc DeleteFund(DeleteFundRequest) returns (DeleteFundResponse);
   rpc InvestFund(InvestFundRequest) returns (FundResponse);
-  rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
+  rpc WithdrawFund(WithdrawFundRequest) returns (WithdrawFundResponse);
+  rpc CheckPendingWithdrawals(CheckPendingWithdrawalsRequest) returns (CheckPendingWithdrawalsResponse);
   rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
   rpc GetMyPositions(GetMyPositionsRequest) returns (GetMyPositionsResponse);
+  rpc TransferFundsByManager(TransferFundsByManagerRequest) returns (TransferFundsByManagerResponse);
   rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
   rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
+  rpc GetFundPortfolio(GetFundPortfolioRequest) returns (GetFundPortfolioResponse);
 }
 
 message PingRequest {}
@@ -86,6 +89,15 @@ message WithdrawFundRequest {
   double amount                 = 5; // 0 = full position
 }
 
+message WithdrawFundResponse {
+  bool         pending = 1; // true → 202 Accepted; false → 200 OK
+  string       message = 2;
+  FundResponse fund    = 3; // populated when pending=false
+}
+
+message CheckPendingWithdrawalsRequest  { int64 fund_id   = 1; }
+message CheckPendingWithdrawalsResponse { int64 completed = 1; }
+
 // ── GetBankPositions ──────────────────────────────────────────────────────────
 
 message BankFundPosition {
@@ -122,6 +134,16 @@ message GetMyPositionsResponse {
   repeated ClientFundPosition positions = 1;
 }
 
+// ── TransferFundsByManager ────────────────────────────────────────────────────
+
+message TransferFundsByManagerRequest {
+  int64 old_manager_id = 1;
+  int64 new_manager_id = 2;
+}
+message TransferFundsByManagerResponse {
+  int64 funds_transferred = 1;
+}
+
 // ── ValidateFundAccount ───────────────────────────────────────────────────────
 
 message ValidateFundAccountRequest {
@@ -134,6 +156,18 @@ message ValidateFundAccountResponse {
   bool   is_liquid     = 2;
   double liquid_assets = 3;
 }
+
+// ── GetFundPortfolio ──────────────────────────────────────────────────────────
+
+message FundPortfolioPosition {
+  int64  listing_id       = 1;
+  double quantity         = 2;
+  double average_cost     = 3;
+  string acquisition_date = 4; // "YYYY-MM-DD"
+}
+
+message GetFundPortfolioRequest  { int64 fund_id = 1; }
+message GetFundPortfolioResponse { repeated FundPortfolioPosition positions = 1; }
 
 // ── UpdateFundHolding ─────────────────────────────────────────────────────────
 
