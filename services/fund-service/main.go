@@ -7,6 +7,7 @@ import (
 
 	funddb "github.com/RAF-SI-2025/EXBanka-4-Backend/services/fund-service/db"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/fund-service/handlers"
+	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/fund-service/scheduler"
 	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
@@ -62,6 +63,9 @@ func main() {
 		AccountClient: accountClient,
 		OrderClient:   orderClient,
 	})
+
+	sched := &scheduler.PerformanceScheduler{DB: fundDB}
+	sched.Start()
 
 	log.Printf("fund-service gRPC server listening on %s", grpcPort)
 	if err := srv.Serve(lis); err != nil {

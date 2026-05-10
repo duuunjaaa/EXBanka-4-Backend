@@ -823,3 +823,30 @@ func (s *FundServer) GetFundPortfolio(ctx context.Context, req *pb.GetFundPortfo
 	}
 	return &pb.GetFundPortfolioResponse{Positions: positions}, nil
 }
+
+func (s *FundServer) GetFundPerformanceHistory(ctx context.Context, req *pb.GetFundPerformanceRequest) (*pb.GetFundPerformanceResponse, error) {
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT TO_CHAR(date, 'YYYY-MM-DD'), fund_value, profit
+		 FROM fund_performance_history
+		 WHERE fund_id = $1 AND date >= $2 AND date <= $3
+		 ORDER BY date ASC`,
+		req.FundId, req.From, req.To,
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "query performance history: %v", err)
+	}
+	defer rows.Close()
+
+	var records []*pb.PerformanceRecord
+	for rows.Next() {
+		var r pb.PerformanceRecord
+		if err := rows.Scan(&r.Date, &r.FundValue, &r.Profit); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan performance record: %v", err)
+		}
+		records = append(records, &r)
+	}
+	if records == nil {
+		records = []*pb.PerformanceRecord{}
+	}
+	return &pb.GetFundPerformanceResponse{Records: records}, nil
+}

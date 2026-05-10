@@ -18,6 +18,7 @@ service FundService {
   rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
   rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
   rpc GetFundPortfolio(GetFundPortfolioRequest) returns (GetFundPortfolioResponse);
+  rpc GetFundPerformanceHistory(GetFundPerformanceRequest) returns (GetFundPerformanceResponse);
 }
 
 message PingRequest {}
@@ -168,6 +169,22 @@ message FundPortfolioPosition {
 
 message GetFundPortfolioRequest  { int64 fund_id = 1; }
 message GetFundPortfolioResponse { repeated FundPortfolioPosition positions = 1; }
+
+// ── GetFundPerformanceHistory ─────────────────────────────────────────────────
+
+message PerformanceRecord {
+  string date       = 1;
+  double fund_value = 2;
+  double profit     = 3;
+}
+message GetFundPerformanceRequest {
+  int64  fund_id = 1;
+  string from    = 2; // "YYYY-MM-DD"
+  string to      = 3;
+}
+message GetFundPerformanceResponse {
+  repeated PerformanceRecord records = 1;
+}
 
 // ── UpdateFundHolding ─────────────────────────────────────────────────────────
 
