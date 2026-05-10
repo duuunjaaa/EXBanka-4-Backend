@@ -649,7 +649,7 @@ func TestUpdateFundHolding_Buy(t *testing.T) {
 		WithArgs(500.0, int64(1)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	fundMock.ExpectExec("INSERT INTO fund_portfolio_positions").
-		WithArgs(int64(1), int64(10), int64(5)).
+		WithArgs(int64(1), int64(10), int64(5), 100.0).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	fundMock.ExpectCommit()
 
@@ -667,9 +667,12 @@ func TestUpdateFundHolding_Sell(t *testing.T) {
 	fundMock.ExpectExec("UPDATE investment_funds SET liquid_assets = liquid_assets \\+").
 		WithArgs(300.0, int64(1)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	fundMock.ExpectExec("INSERT INTO fund_portfolio_positions").
-		WithArgs(int64(1), int64(10), int64(-3)).
+	fundMock.ExpectExec("UPDATE fund_portfolio_positions SET quantity = quantity -").
+		WithArgs(int64(3), int64(1), int64(10)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("DELETE FROM fund_portfolio_positions").
+		WithArgs(int64(1), int64(10)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	fundMock.ExpectCommit()
 
 	_, err := s.UpdateFundHolding(context.Background(), &pb.UpdateFundHoldingRequest{
@@ -756,5 +759,41 @@ func TestGetMyPositions_Happy(t *testing.T) {
 	assert.InDelta(t, 100.0, pos.FundPercentage, 0.01)
 	// profit = 50000 - 10000 = 40000
 	assert.InDelta(t, 40000.0, pos.Profit, 0.01)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+// ── GetFundPortfolio ──────────────────────────────────────────────────────────
+
+func TestGetFundPortfolio_Empty(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	cols := []string{"listing_id", "quantity", "average_cost", "acquisition_date"}
+	fundMock.ExpectQuery("SELECT listing_id, quantity, average_cost, acquisition_date").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows(cols))
+
+	resp, err := s.GetFundPortfolio(context.Background(), &pb.GetFundPortfolioRequest{FundId: 1})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Positions)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetFundPortfolio_Happy(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	acqDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	cols := []string{"listing_id", "quantity", "average_cost", "acquisition_date"}
+	rows := sqlmock.NewRows(cols).AddRow(int64(10), 50.0, 125.0, acqDate)
+	fundMock.ExpectQuery("SELECT listing_id, quantity, average_cost, acquisition_date").
+		WithArgs(int64(1)).
+		WillReturnRows(rows)
+
+	resp, err := s.GetFundPortfolio(context.Background(), &pb.GetFundPortfolioRequest{FundId: 1})
+	require.NoError(t, err)
+	require.Len(t, resp.Positions, 1)
+	assert.Equal(t, int64(10), resp.Positions[0].ListingId)
+	assert.InDelta(t, 50.0, resp.Positions[0].Quantity, 0.001)
+	assert.InDelta(t, 125.0, resp.Positions[0].AverageCost, 0.001)
+	assert.Equal(t, "2026-04-01", resp.Positions[0].AcquisitionDate)
 	require.NoError(t, fundMock.ExpectationsWereMet())
 }

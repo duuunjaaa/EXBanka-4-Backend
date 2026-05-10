@@ -481,18 +481,31 @@ func (s *FundServer) UpdateFundHolding(ctx context.Context, req *pb.UpdateFundHo
 		return nil, status.Errorf(codes.Internal, "update liquid_assets: %v", err)
 	}
 
-	quantityDelta := req.Quantity
-	if req.Direction == "SELL" {
-		quantityDelta = -req.Quantity
-	}
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO fund_portfolio_positions (fund_id, listing_id, quantity)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (fund_id, listing_id) DO UPDATE
-		  SET quantity = fund_portfolio_positions.quantity + EXCLUDED.quantity`,
-		req.FundId, req.ListingId, quantityDelta)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "upsert fund position: %v", err)
+	if req.Direction == "BUY" {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO fund_portfolio_positions (fund_id, listing_id, quantity, average_cost, acquisition_date)
+			VALUES ($1, $2, $3, $4, CURRENT_DATE)
+			ON CONFLICT (fund_id, listing_id) DO UPDATE SET
+			  average_cost = (fund_portfolio_positions.quantity * fund_portfolio_positions.average_cost + $3 * $4)
+			               / (fund_portfolio_positions.quantity + $3),
+			  quantity     = fund_portfolio_positions.quantity + $3`,
+			req.FundId, req.ListingId, req.Quantity, req.Price)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "upsert fund position: %v", err)
+		}
+	} else {
+		_, err = tx.ExecContext(ctx,
+			`UPDATE fund_portfolio_positions SET quantity = quantity - $1 WHERE fund_id = $2 AND listing_id = $3`,
+			req.Quantity, req.FundId, req.ListingId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "update fund position: %v", err)
+		}
+		_, err = tx.ExecContext(ctx,
+			`DELETE FROM fund_portfolio_positions WHERE fund_id = $1 AND listing_id = $2 AND quantity <= 0`,
+			req.FundId, req.ListingId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "cleanup fund position: %v", err)
+		}
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -642,4 +655,30 @@ func (s *FundServer) GetBankPositions(ctx context.Context, _ *pb.GetBankPosition
 		positions = []*pb.BankFundPosition{}
 	}
 	return &pb.GetBankPositionsResponse{Positions: positions}, nil
+}
+
+func (s *FundServer) GetFundPortfolio(ctx context.Context, req *pb.GetFundPortfolioRequest) (*pb.GetFundPortfolioResponse, error) {
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT listing_id, quantity, average_cost, acquisition_date
+		 FROM fund_portfolio_positions
+		 WHERE fund_id = $1 AND quantity > 0`, req.FundId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get fund portfolio: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var positions []*pb.FundPortfolioPosition
+	for rows.Next() {
+		var p pb.FundPortfolioPosition
+		var acqDate time.Time
+		if err := rows.Scan(&p.ListingId, &p.Quantity, &p.AverageCost, &acqDate); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan position: %v", err)
+		}
+		p.AcquisitionDate = acqDate.Format("2006-01-02")
+		positions = append(positions, &p)
+	}
+	if positions == nil {
+		positions = []*pb.FundPortfolioPosition{}
+	}
+	return &pb.GetFundPortfolioResponse{Positions: positions}, nil
 }

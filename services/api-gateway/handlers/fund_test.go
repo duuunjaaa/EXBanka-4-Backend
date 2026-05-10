@@ -9,6 +9,8 @@ import (
 	"time"
 
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
+	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
+	pb_sec "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -44,6 +46,7 @@ type stubFundClient struct {
 	updateFundHoldingFn      func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
 	getMyPositionsFn         func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
 	transferFundsByManagerFn func(context.Context, *pb.TransferFundsByManagerRequest, ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error)
+	getFundPortfolioFn       func(context.Context, *pb.GetFundPortfolioRequest, ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -123,6 +126,12 @@ func (s *stubFundClient) TransferFundsByManager(ctx context.Context, in *pb.Tran
 		return s.transferFundsByManagerFn(ctx, in, opts...)
 	}
 	return &pb.TransferFundsByManagerResponse{}, nil
+}
+func (s *stubFundClient) GetFundPortfolio(ctx context.Context, in *pb.GetFundPortfolioRequest, opts ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error) {
+	if s.getFundPortfolioFn != nil {
+		return s.getFundPortfolioFn(ctx, in, opts...)
+	}
+	return &pb.GetFundPortfolioResponse{}, nil
 }
 
 // sampleFund returns a sample FundResponse.
@@ -477,5 +486,214 @@ func TestGetMyPositions_Happy(t *testing.T) {
 	}
 	if resp[0]["profit"] != float64(40000) {
 		t.Fatalf("unexpected profit: %v", resp[0]["profit"])
+	}
+}
+
+// ---- GetFundSecurities tests ----
+
+func TestGetFundSecurities_Empty(t *testing.T) {
+	fund := &stubFundClient{
+		getFundPortfolioFn: func(_ context.Context, _ *pb.GetFundPortfolioRequest, _ ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error) {
+			return &pb.GetFundPortfolioResponse{Positions: []*pb.FundPortfolioPosition{}}, nil
+		},
+	}
+	w := serveHandlerFull(GetFundSecurities(fund, &stubSecuritiesClient{}), "GET", "/investment/funds/:id/securities", "/investment/funds/1/securities", "", makeSupervisorToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+	var resp []interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp) != 0 {
+		t.Fatalf("expected empty array, got %d items", len(resp))
+	}
+}
+
+func TestGetFundSecurities_Happy(t *testing.T) {
+	fund := &stubFundClient{
+		getFundPortfolioFn: func(_ context.Context, _ *pb.GetFundPortfolioRequest, _ ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error) {
+			return &pb.GetFundPortfolioResponse{
+				Positions: []*pb.FundPortfolioPosition{
+					{ListingId: 10, Quantity: 50, AverageCost: 125.0, AcquisitionDate: "2026-04-01"},
+				},
+			}, nil
+		},
+	}
+	sec := &stubSecuritiesClient{
+		getListingByIdFn: func(_ context.Context, req *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+			return &pb_sec.GetListingByIdResponse{
+				Summary: &pb_sec.ListingSummary{
+					Id: 10, Ticker: "AAPL", Name: "Apple Inc.", Price: 175.0,
+					ChangePercent: 1.25, Volume: 50000, InitialMarginCost: 3500.0,
+				},
+			}, nil
+		},
+	}
+	w := serveHandlerFull(GetFundSecurities(fund, sec), "GET", "/investment/funds/:id/securities", "/investment/funds/1/securities", "", makeSupervisorToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+	var resp []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(resp))
+	}
+	if resp[0]["ticker"] != "AAPL" {
+		t.Fatalf("unexpected ticker: %v", resp[0]["ticker"])
+	}
+	if resp[0]["acquisitionDate"] != "2026-04-01" {
+		t.Fatalf("unexpected acquisitionDate: %v", resp[0]["acquisitionDate"])
+	}
+}
+
+// ---- BuyFundSecurities tests ----
+
+var buyBody = `{"ticker":"AAPL","amount":10}`
+
+func TestBuyFundSecurities_TickerNotFound(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{}}, nil
+		},
+	}
+	w := serveHandlerFull(BuyFundSecurities(&stubFundClient{}, sec, &stubOrderClient{}), "POST", "/investment/funds/:id/securities/buy", "/investment/funds/1/securities/buy", buyBody, makeSupervisorToken())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBuyFundSecurities_InsufficientLiquidity(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{{Id: 10, Price: 175.0}}}, nil
+		},
+	}
+	fund := &stubFundClient{
+		validateFundAccountFn: func(_ context.Context, _ *pb.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error) {
+			return &pb.ValidateFundAccountResponse{AccountId: 100, IsLiquid: false, LiquidAssets: 100.0}, nil
+		},
+	}
+	w := serveHandlerFull(BuyFundSecurities(fund, sec, &stubOrderClient{}), "POST", "/investment/funds/:id/securities/buy", "/investment/funds/1/securities/buy", buyBody, makeSupervisorToken())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBuyFundSecurities_NotManager(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{{Id: 10, Price: 175.0}}}, nil
+		},
+	}
+	fund := &stubFundClient{
+		validateFundAccountFn: func(_ context.Context, _ *pb.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error) {
+			return nil, status.Error(codes.PermissionDenied, "not the fund manager")
+		},
+	}
+	w := serveHandlerFull(BuyFundSecurities(fund, sec, &stubOrderClient{}), "POST", "/investment/funds/:id/securities/buy", "/investment/funds/1/securities/buy", buyBody, makeSupervisorToken())
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBuyFundSecurities_Success(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{{Id: 10, Price: 175.0}}}, nil
+		},
+	}
+	fund := &stubFundClient{
+		validateFundAccountFn: func(_ context.Context, _ *pb.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error) {
+			return &pb.ValidateFundAccountResponse{AccountId: 100, IsLiquid: true, LiquidAssets: 99999.0}, nil
+		},
+	}
+	order := &stubOrderClient{
+		createOrderFn: func(_ context.Context, _ *pb_order.CreateOrderRequest, _ ...grpc.CallOption) (*pb_order.CreateOrderResponse, error) {
+			return &pb_order.CreateOrderResponse{OrderId: 42, OrderType: "MARKET", Status: "APPROVED"}, nil
+		},
+	}
+	w := serveHandlerFull(BuyFundSecurities(fund, sec, order), "POST", "/investment/funds/:id/securities/buy", "/investment/funds/1/securities/buy", buyBody, makeSupervisorToken())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if resp["orderId"] != float64(42) {
+		t.Fatalf("unexpected orderId: %v", resp["orderId"])
+	}
+}
+
+// ---- SellFundSecurities tests ----
+
+var sellBody = `{"ticker":"AAPL","amount":5}`
+
+func TestSellFundSecurities_NoPosition(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{{Id: 10, Price: 175.0}}}, nil
+		},
+	}
+	fund := &stubFundClient{} // getFundPortfolioFn returns empty by default
+	w := serveHandlerFull(SellFundSecurities(fund, sec, &stubOrderClient{}), "POST", "/investment/funds/:id/securities/sell", "/investment/funds/1/securities/sell", sellBody, makeSupervisorToken())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSellFundSecurities_InsufficientAmount(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{{Id: 10, Price: 175.0}}}, nil
+		},
+	}
+	fund := &stubFundClient{
+		getFundPortfolioFn: func(_ context.Context, _ *pb.GetFundPortfolioRequest, _ ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error) {
+			return &pb.GetFundPortfolioResponse{
+				Positions: []*pb.FundPortfolioPosition{{ListingId: 10, Quantity: 3}}, // only 3, selling 5
+			}, nil
+		},
+	}
+	w := serveHandlerFull(SellFundSecurities(fund, sec, &stubOrderClient{}), "POST", "/investment/funds/:id/securities/sell", "/investment/funds/1/securities/sell", sellBody, makeSupervisorToken())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSellFundSecurities_Success(t *testing.T) {
+	sec := &stubSecuritiesClient{
+		getListingsFn: func(_ context.Context, _ *pb_sec.GetListingsRequest, _ ...grpc.CallOption) (*pb_sec.GetListingsResponse, error) {
+			return &pb_sec.GetListingsResponse{Listings: []*pb_sec.ListingSummary{{Id: 10, Price: 175.0}}}, nil
+		},
+	}
+	fund := &stubFundClient{
+		getFundPortfolioFn: func(_ context.Context, _ *pb.GetFundPortfolioRequest, _ ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error) {
+			return &pb.GetFundPortfolioResponse{
+				Positions: []*pb.FundPortfolioPosition{{ListingId: 10, Quantity: 50}},
+			}, nil
+		},
+		validateFundAccountFn: func(_ context.Context, _ *pb.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error) {
+			return &pb.ValidateFundAccountResponse{AccountId: 100, IsLiquid: true}, nil
+		},
+	}
+	order := &stubOrderClient{
+		createOrderFn: func(_ context.Context, _ *pb_order.CreateOrderRequest, _ ...grpc.CallOption) (*pb_order.CreateOrderResponse, error) {
+			return &pb_order.CreateOrderResponse{OrderId: 55, OrderType: "MARKET", Status: "APPROVED"}, nil
+		},
+	}
+	w := serveHandlerFull(SellFundSecurities(fund, sec, order), "POST", "/investment/funds/:id/securities/sell", "/investment/funds/1/securities/sell", sellBody, makeSupervisorToken())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if resp["orderId"] != float64(55) {
+		t.Fatalf("unexpected orderId: %v", resp["orderId"])
 	}
 }
