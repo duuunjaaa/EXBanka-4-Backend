@@ -9,6 +9,7 @@ import (
 	exdb "github.com/RAF-SI-2025/EXBanka-4-Backend/services/exchange-service/db"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/exchange-service/handlers"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -68,6 +69,10 @@ func main() {
 		log.Fatalf("migration failed: %v", err)
 	}
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
+	})
+
 	lis, err := net.Listen("tcp", grpcPort)
 	if err != nil {
 		log.Fatalf("failed to listen on %s: %v", grpcPort, err)
@@ -77,6 +82,7 @@ func main() {
 	pb.RegisterExchangeServiceServer(srv, &handlers.ExchangeServer{
 		DB:        exchangeDB,
 		AccountDB: accountDB,
+		Redis:     redisClient,
 	})
 
 	log.Printf("exchange-service gRPC server listening on %s", grpcPort)

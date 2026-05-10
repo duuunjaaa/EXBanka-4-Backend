@@ -13,6 +13,7 @@ import (
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/securities-service/scheduler"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/securities-service/seeder"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -40,16 +41,21 @@ func main() {
 		log.Fatalf("failed to listen on %s: %v", grpcPort, err)
 	}
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
+	})
+
 	srv := grpc.NewServer()
 	pb.RegisterSecuritiesServiceServer(srv, &handlers.SecuritiesServer{
-		DB: securitiesDB,
+		DB:    securitiesDB,
+		Redis: redisClient,
 	})
 
 	// Seed data on startup (runs in background, does not block gRPC server).
 	go seeder.Seed(securitiesDB, os.Getenv("ALPACA_API_KEY"), os.Getenv("ALPACA_API_SECRET_KEY"), os.Getenv("ALPHAVANTAGE_API_KEY"), exchangeCSV, futureDataCSV)
 
 	// Refresh prices every 15 minutes.
-	scheduler.StartPriceRefresh(securitiesDB, os.Getenv("ALPHAVANTAGE_API_KEY"), 15*time.Minute)
+	scheduler.StartPriceRefresh(securitiesDB, os.Getenv("ALPHAVANTAGE_API_KEY"), 15*time.Minute, redisClient)
 
 	// Snapshot daily prices + reset actuary limits at 23:59 every day.
 	scheduler.ScheduleEOD(securitiesDB, os.Getenv("EMPLOYEE_SERVICE_ADDR"))

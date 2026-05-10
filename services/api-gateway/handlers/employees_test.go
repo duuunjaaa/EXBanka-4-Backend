@@ -248,6 +248,9 @@ func (s *stubAuthClient) GetPushToken(ctx context.Context, in *authpb.GetPushTok
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubAuthClient) Logout(ctx context.Context, in *authpb.LogoutRequest, opts ...grpc.CallOption) (*authpb.LogoutResponse, error) {
+	return &authpb.LogoutResponse{}, nil
+}
 
 // ---- stub email client ----
 

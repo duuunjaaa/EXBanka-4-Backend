@@ -8,7 +8,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 )
+
+var redisClient *redis.Client
+
+// InitRedis sets the Redis client used for token blacklist checks.
+func InitRedis(rdb *redis.Client) {
+	redisClient = rdb
+}
 
 // GetUserIDFromToken extracts the user_id claim from the Bearer token in the request.
 func GetUserIDFromToken(c *gin.Context) (int64, error) {
@@ -141,6 +149,14 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 		if claims["type"] != "access" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token type"})
 			return
+		}
+
+		if jti, _ := claims["jti"].(string); jti != "" && redisClient != nil {
+			val, _ := redisClient.Get(c.Request.Context(), "blacklist:"+jti).Result()
+			if val != "" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token revoked"})
+				return
+			}
 		}
 
 		dozvole, _ := claims["dozvole"].([]interface{})
