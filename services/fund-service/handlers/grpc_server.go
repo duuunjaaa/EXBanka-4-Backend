@@ -501,6 +501,17 @@ func (s *FundServer) UpdateFundHolding(ctx context.Context, req *pb.UpdateFundHo
 	return &pb.UpdateFundHoldingResponse{}, nil
 }
 
+func (s *FundServer) TransferFundsByManager(ctx context.Context, req *pb.TransferFundsByManagerRequest) (*pb.TransferFundsByManagerResponse, error) {
+	res, err := s.DB.ExecContext(ctx,
+		`UPDATE investment_funds SET manager_id = $1 WHERE manager_id = $2 AND active = TRUE`,
+		req.NewManagerId, req.OldManagerId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "transfer funds: %v", err)
+	}
+	n, _ := res.RowsAffected()
+	return &pb.TransferFundsByManagerResponse{FundsTransferred: n}, nil
+}
+
 func (s *FundServer) GetMyPositions(ctx context.Context, req *pb.GetMyPositionsRequest) (*pb.GetMyPositionsResponse, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT cfp.fund_id,

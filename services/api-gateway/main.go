@@ -122,7 +122,7 @@ func main() {
 	r.GET("/employees/:id", middleware.RequireRole("ADMIN"), handlers.GetEmployeeById(employeeClient))
 	r.GET("/employees", middleware.RequireRole("ADMIN"), handlers.GetEmployees(employeeClient))
 	r.GET("/employees/search", middleware.RequireRole("ADMIN"), handlers.SearchEmployees(employeeClient))
-	r.PUT("/employees/:id", middleware.RequireRole("ADMIN"), handlers.UpdateEmployee(employeeClient))
+	r.PUT("/employees/:id", middleware.RequireRole("ADMIN"), handlers.UpdateEmployee(employeeClient, fundClient))
 	r.POST("/employees", middleware.RequireRole("ADMIN"), handlers.CreateEmployee(employeeClient, authClient, emailClient))
 	r.GET("/api/actuaries", middleware.RequireRole("SUPERVISOR"), handlers.GetActuaries(employeeClient))
 	r.PUT("/api/actuaries/:id/limit", middleware.RequireRole("SUPERVISOR"), handlers.SetAgentLimit(employeeClient))

@@ -679,6 +679,38 @@ func TestUpdateFundHolding_Sell(t *testing.T) {
 	require.NoError(t, fundMock.ExpectationsWereMet())
 }
 
+func TestTransferFundsByManager_Happy(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectExec("UPDATE investment_funds SET manager_id").
+		WithArgs(int64(99), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+
+	resp, err := s.TransferFundsByManager(context.Background(), &pb.TransferFundsByManagerRequest{
+		OldManagerId: 7,
+		NewManagerId: 99,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), resp.FundsTransferred)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestTransferFundsByManager_NoFunds(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectExec("UPDATE investment_funds SET manager_id").
+		WithArgs(int64(99), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	resp, err := s.TransferFundsByManager(context.Background(), &pb.TransferFundsByManagerRequest{
+		OldManagerId: 7,
+		NewManagerId: 99,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), resp.FundsTransferred)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
 func TestGetMyPositions_Empty(t *testing.T) {
 	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
 
