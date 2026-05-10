@@ -1233,9 +1233,9 @@ func TestGetActuaryPerformers_ReturnsAgentAndSupervisor(t *testing.T) {
 	s := &EmployeeServer{DB: db}
 
 	rows := sqlmock.NewRows([]string{"id", "first_name", "last_name", "position"}).
-		AddRow(int64(1), "Ana", "Jovanovic", "Agent").
-		AddRow(int64(2), "Marko", "Petrovic", "Supervisor")
-	dbMock.ExpectQuery(`SELECT id, first_name, last_name, position FROM employees`).
+		AddRow(int64(1), "Ana", "Jovanovic", "AGENT").
+		AddRow(int64(2), "Marko", "Petrovic", "SUPERVISOR")
+	dbMock.ExpectQuery(`SELECT id, first_name, last_name`).
 		WillReturnRows(rows)
 
 	resp, err := s.GetActuaryPerformers(context.Background(), &pb.GetActuaryPerformersRequest{})
@@ -1243,7 +1243,7 @@ func TestGetActuaryPerformers_ReturnsAgentAndSupervisor(t *testing.T) {
 	require.Len(t, resp.Performers, 2)
 	assert.Equal(t, int64(1), resp.Performers[0].UserId)
 	assert.Equal(t, "Ana", resp.Performers[0].FirstName)
-	assert.Equal(t, "Supervisor", resp.Performers[1].Position)
+	assert.Equal(t, "SUPERVISOR", resp.Performers[1].Position)
 	require.NoError(t, dbMock.ExpectationsWereMet())
 }
 
@@ -1253,7 +1253,7 @@ func TestGetActuaryPerformers_Empty(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	s := &EmployeeServer{DB: db}
 
-	dbMock.ExpectQuery(`SELECT id, first_name, last_name, position FROM employees`).
+	dbMock.ExpectQuery(`SELECT id, first_name, last_name`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "first_name", "last_name", "position"}))
 
 	resp, err := s.GetActuaryPerformers(context.Background(), &pb.GetActuaryPerformersRequest{})
@@ -1268,7 +1268,7 @@ func TestGetActuaryPerformers_DBError(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	s := &EmployeeServer{DB: db}
 
-	dbMock.ExpectQuery(`SELECT id, first_name, last_name, position FROM employees`).
+	dbMock.ExpectQuery(`SELECT id, first_name, last_name`).
 		WillReturnError(sql.ErrConnDone)
 
 	_, err = s.GetActuaryPerformers(context.Background(), &pb.GetActuaryPerformersRequest{})

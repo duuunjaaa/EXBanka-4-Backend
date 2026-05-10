@@ -498,7 +498,12 @@ func (s *EmployeeServer) ResetAllActuaryUsedLimits(ctx context.Context, _ *pb.Re
 // Used by the bank profit portal to show per-actuary realized P&L (#226).
 func (s *EmployeeServer) GetActuaryPerformers(ctx context.Context, _ *pb.GetActuaryPerformersRequest) (*pb.GetActuaryPerformersResponse, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, first_name, last_name, position
+		SELECT id, first_name, last_name,
+		       CASE
+		           WHEN 'ADMIN'      = ANY(permissions) THEN 'ADMIN'
+		           WHEN 'SUPERVISOR' = ANY(permissions) THEN 'SUPERVISOR'
+		           ELSE 'AGENT'
+		       END AS position
 		FROM employees
 		WHERE ('AGENT' = ANY(permissions) OR 'SUPERVISOR' = ANY(permissions) OR 'ADMIN' = ANY(permissions))
 		  AND active = TRUE

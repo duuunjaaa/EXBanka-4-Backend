@@ -140,6 +140,10 @@ func (m *mockEmployeeClient) ResetAllActuaryUsedLimits(ctx context.Context, in *
 	return args.Get(0).(*pb_emp.ResetAllActuaryUsedLimitsResponse), args.Error(1)
 }
 
+func (m *mockEmployeeClient) GetActuaryPerformers(ctx context.Context, in *pb_emp.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb_emp.GetActuaryPerformersResponse, error) {
+	return nil, nil
+}
+
 type mockEmailClient struct {
 	mock.Mock
 }
