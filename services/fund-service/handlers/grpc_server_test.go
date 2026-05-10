@@ -678,3 +678,51 @@ func TestUpdateFundHolding_Sell(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, fundMock.ExpectationsWereMet())
 }
+
+func TestGetMyPositions_Empty(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery("SELECT cfp.fund_id").
+		WithArgs(int64(42), "CLIENT").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"fund_id", "total_invested_amount", "name", "description",
+			"fund_value", "minimum_contribution", "total_all_invested",
+		}))
+
+	resp, err := s.GetMyPositions(context.Background(), &pb.GetMyPositionsRequest{
+		ClientId: 42, ClientType: "CLIENT",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Positions)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestGetMyPositions_Happy(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	// client invested 10000, total all invested is also 10000 (sole investor), fund value 50000
+	fundMock.ExpectQuery("SELECT cfp.fund_id").
+		WithArgs(int64(1), "CLIENT").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"fund_id", "total_invested_amount", "name", "description",
+			"fund_value", "minimum_contribution", "total_all_invested",
+		}).AddRow(int64(7), float64(10000), "RAF Growth Fund", "A growth fund", float64(50000), float64(1000), float64(10000)))
+
+	resp, err := s.GetMyPositions(context.Background(), &pb.GetMyPositionsRequest{
+		ClientId: 1, ClientType: "CLIENT",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Positions, 1)
+
+	pos := resp.Positions[0]
+	assert.Equal(t, int64(7), pos.FundId)
+	assert.Equal(t, "RAF Growth Fund", pos.FundName)
+	assert.Equal(t, float64(10000), pos.TotalInvestedAmount)
+	// currentPositionValue = (10000/10000) * 50000 = 50000
+	assert.InDelta(t, 50000.0, pos.CurrentPositionValue, 0.01)
+	// fundPercentage = (50000/50000) * 100 = 100
+	assert.InDelta(t, 100.0, pos.FundPercentage, 0.01)
+	// profit = 50000 - 10000 = 40000
+	assert.InDelta(t, 40000.0, pos.Profit, 0.01)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}

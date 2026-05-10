@@ -453,8 +453,8 @@ func (s *FundServer) ValidateFundAccount(ctx context.Context, req *pb.ValidateFu
 		return nil, status.Error(codes.PermissionDenied, "not the fund manager")
 	}
 	return &pb.ValidateFundAccountResponse{
-		AccountId:   accountID,
-		IsLiquid:    liquidAssets >= req.RequiredAmount,
+		AccountId:    accountID,
+		IsLiquid:     liquidAssets >= req.RequiredAmount,
 		LiquidAssets: liquidAssets,
 	}, nil
 }
@@ -499,6 +499,71 @@ func (s *FundServer) UpdateFundHolding(ctx context.Context, req *pb.UpdateFundHo
 		return nil, status.Errorf(codes.Internal, "commit: %v", err)
 	}
 	return &pb.UpdateFundHoldingResponse{}, nil
+}
+
+func (s *FundServer) GetMyPositions(ctx context.Context, req *pb.GetMyPositionsRequest) (*pb.GetMyPositionsResponse, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT cfp.fund_id,
+		       cfp.total_invested_amount,
+		       f.name,
+		       COALESCE(f.description, ''),
+		       f.liquid_assets            AS fund_value,
+		       f.minimum_contribution,
+		       COALESCE((SELECT SUM(total_invested_amount)
+		                 FROM client_fund_positions
+		                 WHERE fund_id = cfp.fund_id), 0) AS total_all_invested
+		FROM client_fund_positions cfp
+		JOIN investment_funds f ON f.id = cfp.fund_id
+		WHERE cfp.client_id   = $1
+		  AND cfp.client_type = $2
+		  AND f.active        = TRUE`,
+		req.ClientId, req.ClientType)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get my positions: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var positions []*pb.ClientFundPosition
+	for rows.Next() {
+		var (
+			fundID           int64
+			totalInvested    float64
+			fundName         string
+			description      string
+			fundValue        float64
+			minContribution  float64
+			totalAllInvested float64
+		)
+		if err := rows.Scan(&fundID, &totalInvested, &fundName, &description,
+			&fundValue, &minContribution, &totalAllInvested); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan position: %v", err)
+		}
+
+		var currentPositionValue float64
+		if totalAllInvested > 0 {
+			currentPositionValue = (totalInvested / totalAllInvested) * fundValue
+		}
+		var fundPercentage float64
+		if fundValue > 0 {
+			fundPercentage = (currentPositionValue / fundValue) * 100
+		}
+
+		positions = append(positions, &pb.ClientFundPosition{
+			FundId:               fundID,
+			FundName:             fundName,
+			Description:          description,
+			FundValue:            fundValue,
+			FundPercentage:       fundPercentage,
+			CurrentPositionValue: currentPositionValue,
+			TotalInvestedAmount:  totalInvested,
+			Profit:               currentPositionValue - totalInvested,
+			MinimumContribution:  minContribution,
+		})
+	}
+	if positions == nil {
+		positions = []*pb.ClientFundPosition{}
+	}
+	return &pb.GetMyPositionsResponse{Positions: positions}, nil
 }
 
 // GetBankPositions returns all investment fund positions held by the bank (client_type='BANK', client_id=0).
