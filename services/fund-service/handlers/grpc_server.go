@@ -8,6 +8,7 @@ import (
 
 	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
+	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,6 +19,7 @@ type FundServer struct {
 	AccountDB     *sql.DB // account_db
 	EmployeeDB    *sql.DB // employee_db
 	AccountClient pb_account.AccountServiceClient
+	OrderClient   pb_order.OrderServiceClient
 }
 
 func (s *FundServer) Ping(_ context.Context, _ *pb.PingRequest) (*pb.PingResponse, error) {
@@ -324,7 +326,7 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 	return s.fetchFundByID(ctx, req.FundId, true)
 }
 
-func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundRequest) (*pb.FundResponse, error) {
+func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundRequest) (*pb.WithdrawFundResponse, error) {
 	var liquidAssets float64
 	var active bool
 	err := s.DB.QueryRowContext(ctx,
@@ -360,10 +362,17 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 	if amount > positionAmount {
 		return nil, status.Errorf(codes.InvalidArgument, "withdrawal amount %.2f exceeds position %.2f", amount, positionAmount)
 	}
+
+	// Case 2: insufficient liquidity
 	if amount > liquidAssets {
-		return nil, status.Error(codes.FailedPrecondition, "insufficient fund liquidity")
+		if req.ClientType != "CLIENT" {
+			return nil, status.Error(codes.FailedPrecondition, "insufficient fund liquidity")
+		}
+		// Auto-liquidate: sell portfolio positions until deficit is covered
+		return s.autoLiquidate(ctx, req, amount, liquidAssets)
 	}
 
+	// Case 1: sufficient liquidity — immediate settlement
 	_, err = s.AccountDB.ExecContext(ctx,
 		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
 		amount, req.DestinationAccountId,
@@ -428,7 +437,139 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 		return nil, status.Errorf(codes.Internal, "failed to commit: %v", err)
 	}
 
-	return s.fetchFundByID(ctx, req.FundId, true)
+	fund, err := s.fetchFundByID(ctx, req.FundId, true)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.WithdrawFundResponse{Pending: false, Fund: fund}, nil
+}
+
+// autoLiquidate handles Case 2: sells portfolio positions to cover a withdrawal deficit,
+// stores a PENDING transaction, and returns a 202-style response.
+func (s *FundServer) autoLiquidate(ctx context.Context, req *pb.WithdrawFundRequest, amount, liquidAssets float64) (*pb.WithdrawFundResponse, error) {
+	var accountID, managerID int64
+	err := s.DB.QueryRowContext(ctx,
+		`SELECT account_id, manager_id FROM investment_funds WHERE id = $1`, req.FundId,
+	).Scan(&accountID, &managerID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch fund details: %v", err)
+	}
+
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT listing_id, quantity, average_cost FROM fund_portfolio_positions
+		 WHERE fund_id = $1 AND quantity > 0 ORDER BY quantity ASC`, req.FundId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch portfolio: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	deficit := amount - liquidAssets
+	var covered float64
+	for rows.Next() {
+		if covered >= deficit {
+			break
+		}
+		var listingID int64
+		var qty, avgCost float64
+		if err := rows.Scan(&listingID, &qty, &avgCost); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan portfolio position: %v", err)
+		}
+		covered += qty * avgCost
+		if s.OrderClient != nil {
+			_, _ = s.OrderClient.CreateOrder(ctx, &pb_order.CreateOrderRequest{
+				UserId:    managerID,
+				UserType:  "EMPLOYEE",
+				AssetId:   listingID,
+				Quantity:  int32(qty),
+				AccountId: accountID,
+				Direction: "SELL",
+				FundId:    req.FundId,
+			})
+		}
+	}
+
+	_, err = s.DB.ExecContext(ctx,
+		`INSERT INTO client_fund_transactions
+		 (client_id, client_type, fund_id, amount, is_inflow, status, destination_account_id)
+		 VALUES ($1, $2, $3, $4, false, 'PENDING', $5)`,
+		req.ClientId, req.ClientType, req.FundId, amount, req.DestinationAccountId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert pending transaction: %v", err)
+	}
+
+	return &pb.WithdrawFundResponse{
+		Pending: true,
+		Message: "Payment will arrive once orders are executed",
+	}, nil
+}
+
+func (s *FundServer) CheckPendingWithdrawals(ctx context.Context, req *pb.CheckPendingWithdrawalsRequest) (*pb.CheckPendingWithdrawalsResponse, error) {
+	var liquidAssets float64
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT liquid_assets FROM investment_funds WHERE id = $1`, req.FundId,
+	).Scan(&liquidAssets); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch fund: %v", err)
+	}
+
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT id, client_id, client_type, amount, destination_account_id
+		 FROM client_fund_transactions
+		 WHERE fund_id = $1 AND is_inflow = false AND status = 'PENDING'
+		 ORDER BY timestamp ASC`, req.FundId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch pending transactions: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var completed int64
+	for rows.Next() {
+		var txID, clientID, destAccID int64
+		var clientType string
+		var txAmount float64
+		if err := rows.Scan(&txID, &clientID, &clientType, &txAmount, &destAccID); err != nil {
+			continue
+		}
+		if liquidAssets < txAmount {
+			continue
+		}
+
+		_, err = s.AccountDB.ExecContext(ctx,
+			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+			txAmount, destAccID)
+		if err != nil {
+			continue
+		}
+
+		tx, err := s.DB.BeginTx(ctx, nil)
+		if err != nil {
+			// Undo account credit
+			_, _ = s.AccountDB.ExecContext(ctx,
+				`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
+				txAmount, destAccID)
+			continue
+		}
+		_, _ = tx.ExecContext(ctx,
+			`UPDATE investment_funds SET liquid_assets = liquid_assets - $1 WHERE id = $2`,
+			txAmount, req.FundId)
+		_, _ = tx.ExecContext(ctx,
+			`UPDATE client_fund_positions
+			 SET total_invested_amount = total_invested_amount - $1, last_modified_at = NOW()
+			 WHERE fund_id = $2 AND client_id = $3 AND client_type = $4`,
+			txAmount, req.FundId, clientID, clientType)
+		_, _ = tx.ExecContext(ctx,
+			`UPDATE client_fund_transactions SET status = 'COMPLETED' WHERE id = $1`, txID)
+		if err := tx.Commit(); err != nil {
+			_ = tx.Rollback()
+			_, _ = s.AccountDB.ExecContext(ctx,
+				`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
+				txAmount, destAccID)
+			continue
+		}
+
+		liquidAssets -= txAmount
+		completed++
+	}
+	return &pb.CheckPendingWithdrawalsResponse{Completed: completed}, nil
 }
 
 // isUniqueViolation checks if the error is a PostgreSQL unique constraint violation (error code 23505).

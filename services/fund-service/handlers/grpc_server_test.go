@@ -16,6 +16,7 @@ import (
 
 	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
+	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 )
 
 // ---- mock AccountServiceClient ----
@@ -52,10 +53,52 @@ func (m *mockAccountClient) GetBankAccounts(ctx context.Context, in *pb_account.
 	return nil, fmt.Errorf("not implemented")
 }
 
+// ---- mock OrderServiceClient ----
+
+type mockOrderClient struct {
+	createOrderFn func(context.Context, *pb_order.CreateOrderRequest, ...grpc.CallOption) (*pb_order.CreateOrderResponse, error)
+}
+
+func (m *mockOrderClient) Ping(ctx context.Context, in *pb_order.PingRequest, opts ...grpc.CallOption) (*pb_order.PingResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) CreateOrder(ctx context.Context, in *pb_order.CreateOrderRequest, opts ...grpc.CallOption) (*pb_order.CreateOrderResponse, error) {
+	if m.createOrderFn != nil {
+		return m.createOrderFn(ctx, in, opts...)
+	}
+	return &pb_order.CreateOrderResponse{}, nil
+}
+func (m *mockOrderClient) ListOrders(ctx context.Context, in *pb_order.ListOrdersRequest, opts ...grpc.CallOption) (*pb_order.ListOrdersResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) GetOrderById(ctx context.Context, in *pb_order.GetOrderByIdRequest, opts ...grpc.CallOption) (*pb_order.GetOrderByIdResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) ApproveOrder(ctx context.Context, in *pb_order.ApproveOrderRequest, opts ...grpc.CallOption) (*pb_order.ApproveOrderResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) DeclineOrder(ctx context.Context, in *pb_order.DeclineOrderRequest, opts ...grpc.CallOption) (*pb_order.DeclineOrderResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) CancelOrder(ctx context.Context, in *pb_order.CancelOrderRequest, opts ...grpc.CallOption) (*pb_order.CancelOrderResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) CancelOrderPortions(ctx context.Context, in *pb_order.CancelOrderPortionsRequest, opts ...grpc.CallOption) (*pb_order.CancelOrderPortionsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (m *mockOrderClient) GetActuaryProfits(ctx context.Context, in *pb_order.GetActuaryProfitsRequest, opts ...grpc.CallOption) (*pb_order.GetActuaryProfitsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 // ---- helpers ----
 
-// newFundServer creates a FundServer with mocked fund DB, account DB, and employee DB.
+// newFundServer creates a FundServer with mocked DBs and no OrderClient.
 func newFundServer(t *testing.T, acctClient pb_account.AccountServiceClient) (*FundServer, sqlmock.Sqlmock, sqlmock.Sqlmock, sqlmock.Sqlmock) {
+	return newFundServerFull(t, acctClient, nil)
+}
+
+// newFundServerFull creates a FundServer with mocked DBs and an optional OrderClient.
+func newFundServerFull(t *testing.T, acctClient pb_account.AccountServiceClient, orderClient pb_order.OrderServiceClient) (*FundServer, sqlmock.Sqlmock, sqlmock.Sqlmock, sqlmock.Sqlmock) {
 	t.Helper()
 	fundDB, fundMock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -73,6 +116,7 @@ func newFundServer(t *testing.T, acctClient pb_account.AccountServiceClient) (*F
 		AccountDB:     accountDB,
 		EmployeeDB:    employeeDB,
 		AccountClient: acctClient,
+		OrderClient:   orderClient,
 	}, fundMock, accountDBMock, empMock
 }
 
@@ -795,5 +839,186 @@ func TestGetFundPortfolio_Happy(t *testing.T) {
 	assert.InDelta(t, 50.0, resp.Positions[0].Quantity, 0.001)
 	assert.InDelta(t, 125.0, resp.Positions[0].AverageCost, 0.001)
 	assert.Equal(t, "2026-04-01", resp.Positions[0].AcquisitionDate)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+// ── WithdrawFund ──────────────────────────────────────────────────────────────
+
+func TestWithdrawFund_Case1_Immediate(t *testing.T) {
+	s, fundMock, accountDBMock, empMock := newFundServer(t, &mockAccountClient{})
+
+	// SELECT fund: liquid_assets=500000, active=true
+	fundMock.ExpectQuery("SELECT liquid_assets, active FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"liquid_assets", "active"}).AddRow(500000.0, true))
+	// SELECT position
+	fundMock.ExpectQuery("SELECT total_invested_amount FROM client_fund_positions").
+		WillReturnRows(sqlmock.NewRows([]string{"total_invested_amount"}).AddRow(1000.0))
+	// Credit destination account
+	accountDBMock.ExpectExec("UPDATE accounts SET balance").
+		WithArgs(1000.0, int64(99)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	// DB tx
+	fundMock.ExpectBegin()
+	fundMock.ExpectExec("UPDATE investment_funds SET liquid_assets = liquid_assets -").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("UPDATE client_fund_positions SET total_invested_amount").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("INSERT INTO client_fund_transactions").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectCommit()
+	// fetchFundByID
+	addFetchFundRows(fundMock, accountDBMock, empMock, 1, "Test Fund", 100, 5)
+
+	resp, err := s.WithdrawFund(context.Background(), &pb.WithdrawFundRequest{
+		FundId: 1, ClientId: 7, ClientType: "CLIENT",
+		DestinationAccountId: 99, Amount: 1000.0,
+	})
+	require.NoError(t, err)
+	assert.False(t, resp.Pending)
+	assert.NotNil(t, resp.Fund)
+	assert.Equal(t, int64(1), resp.Fund.Id)
+}
+
+func TestWithdrawFund_Case1_WithdrawAll(t *testing.T) {
+	// amount=0 means withdraw full position
+	s, fundMock, accountDBMock, empMock := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery("SELECT liquid_assets, active FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"liquid_assets", "active"}).AddRow(500000.0, true))
+	fundMock.ExpectQuery("SELECT total_invested_amount FROM client_fund_positions").
+		WillReturnRows(sqlmock.NewRows([]string{"total_invested_amount"}).AddRow(2500.0))
+	accountDBMock.ExpectExec("UPDATE accounts SET balance").
+		WithArgs(2500.0, int64(99)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectBegin()
+	fundMock.ExpectExec("UPDATE investment_funds SET liquid_assets = liquid_assets -").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("UPDATE client_fund_positions SET total_invested_amount").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("INSERT INTO client_fund_transactions").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectCommit()
+	addFetchFundRows(fundMock, accountDBMock, empMock, 1, "Test Fund", 100, 5)
+
+	resp, err := s.WithdrawFund(context.Background(), &pb.WithdrawFundRequest{
+		FundId: 1, ClientId: 7, ClientType: "CLIENT",
+		DestinationAccountId: 99, Amount: 0, // withdraw all
+	})
+	require.NoError(t, err)
+	assert.False(t, resp.Pending)
+	assert.NotNil(t, resp.Fund)
+}
+
+func TestWithdrawFund_Case2_ClientAutoLiquidate(t *testing.T) {
+	var createOrderCalled bool
+	order := &mockOrderClient{
+		createOrderFn: func(_ context.Context, req *pb_order.CreateOrderRequest, _ ...grpc.CallOption) (*pb_order.CreateOrderResponse, error) {
+			createOrderCalled = true
+			assert.Equal(t, "SELL", req.Direction)
+			assert.Equal(t, int64(1), req.FundId)
+			return &pb_order.CreateOrderResponse{}, nil
+		},
+	}
+	s, fundMock, _, _ := newFundServerFull(t, &mockAccountClient{}, order)
+
+	// liquid_assets=100 < amount=1000 → Case 2
+	fundMock.ExpectQuery("SELECT liquid_assets, active FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"liquid_assets", "active"}).AddRow(100.0, true))
+	fundMock.ExpectQuery("SELECT total_invested_amount FROM client_fund_positions").
+		WillReturnRows(sqlmock.NewRows([]string{"total_invested_amount"}).AddRow(1000.0))
+	// fetch account_id, manager_id for SELL orders
+	fundMock.ExpectQuery("SELECT account_id, manager_id FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id", "manager_id"}).AddRow(int64(42), int64(5)))
+	// portfolio positions
+	fundMock.ExpectQuery("SELECT listing_id, quantity, average_cost FROM fund_portfolio_positions").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"listing_id", "quantity", "average_cost"}).
+			AddRow(int64(10), 10.0, 100.0)) // 10*100=1000, covers deficit
+	// INSERT PENDING transaction
+	fundMock.ExpectExec("INSERT INTO client_fund_transactions").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	resp, err := s.WithdrawFund(context.Background(), &pb.WithdrawFundRequest{
+		FundId: 1, ClientId: 7, ClientType: "CLIENT",
+		DestinationAccountId: 99, Amount: 1000.0,
+	})
+	require.NoError(t, err)
+	assert.True(t, resp.Pending)
+	assert.Equal(t, "Payment will arrive once orders are executed", resp.Message)
+	assert.True(t, createOrderCalled)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestWithdrawFund_Case2_BankNoAutoLiquidate(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	// liquid_assets=100 < amount=1000, clientType=BANK → FailedPrecondition
+	fundMock.ExpectQuery("SELECT liquid_assets, active FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"liquid_assets", "active"}).AddRow(100.0, true))
+	fundMock.ExpectQuery("SELECT total_invested_amount FROM client_fund_positions").
+		WillReturnRows(sqlmock.NewRows([]string{"total_invested_amount"}).AddRow(1000.0))
+
+	_, err := s.WithdrawFund(context.Background(), &pb.WithdrawFundRequest{
+		FundId: 1, ClientId: 0, ClientType: "BANK",
+		DestinationAccountId: 99, Amount: 1000.0,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+}
+
+// ── CheckPendingWithdrawals ───────────────────────────────────────────────────
+
+func TestCheckPendingWithdrawals_Completed(t *testing.T) {
+	s, fundMock, accountDBMock, _ := newFundServer(t, &mockAccountClient{})
+
+	// liquid_assets sufficient to cover the PENDING tx
+	fundMock.ExpectQuery("SELECT liquid_assets FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"liquid_assets"}).AddRow(5000.0))
+	// One PENDING outflow transaction
+	fundMock.ExpectQuery("SELECT id, client_id, client_type, amount, destination_account_id").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "client_id", "client_type", "amount", "destination_account_id"}).
+			AddRow(int64(1), int64(7), "CLIENT", 1000.0, int64(99)))
+	// Credit destination account
+	accountDBMock.ExpectExec("UPDATE accounts SET balance").
+		WithArgs(1000.0, int64(99)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	// DB tx
+	fundMock.ExpectBegin()
+	fundMock.ExpectExec("UPDATE investment_funds SET liquid_assets = liquid_assets -").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("UPDATE client_fund_positions").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("UPDATE client_fund_transactions SET status = 'COMPLETED'").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectCommit()
+
+	resp, err := s.CheckPendingWithdrawals(context.Background(), &pb.CheckPendingWithdrawalsRequest{FundId: 1})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), resp.Completed)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestCheckPendingWithdrawals_StillInsufficient(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	// liquid_assets still too low
+	fundMock.ExpectQuery("SELECT liquid_assets FROM investment_funds").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"liquid_assets"}).AddRow(50.0))
+	fundMock.ExpectQuery("SELECT id, client_id, client_type, amount, destination_account_id").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "client_id", "client_type", "amount", "destination_account_id"}).
+			AddRow(int64(1), int64(7), "CLIENT", 1000.0, int64(99)))
+
+	resp, err := s.CheckPendingWithdrawals(context.Background(), &pb.CheckPendingWithdrawalsRequest{FundId: 1})
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), resp.Completed)
 	require.NoError(t, fundMock.ExpectationsWereMet())
 }

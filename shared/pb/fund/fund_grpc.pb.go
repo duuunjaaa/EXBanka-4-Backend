@@ -19,20 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FundService_Ping_FullMethodName                   = "/fund.FundService/Ping"
-	FundService_CreateFund_FullMethodName             = "/fund.FundService/CreateFund"
-	FundService_ListFunds_FullMethodName              = "/fund.FundService/ListFunds"
-	FundService_GetFund_FullMethodName                = "/fund.FundService/GetFund"
-	FundService_UpdateFund_FullMethodName             = "/fund.FundService/UpdateFund"
-	FundService_DeleteFund_FullMethodName             = "/fund.FundService/DeleteFund"
-	FundService_InvestFund_FullMethodName             = "/fund.FundService/InvestFund"
-	FundService_WithdrawFund_FullMethodName           = "/fund.FundService/WithdrawFund"
-	FundService_GetBankPositions_FullMethodName       = "/fund.FundService/GetBankPositions"
-	FundService_GetMyPositions_FullMethodName         = "/fund.FundService/GetMyPositions"
-	FundService_TransferFundsByManager_FullMethodName = "/fund.FundService/TransferFundsByManager"
-	FundService_ValidateFundAccount_FullMethodName    = "/fund.FundService/ValidateFundAccount"
-	FundService_UpdateFundHolding_FullMethodName      = "/fund.FundService/UpdateFundHolding"
-	FundService_GetFundPortfolio_FullMethodName       = "/fund.FundService/GetFundPortfolio"
+	FundService_Ping_FullMethodName                    = "/fund.FundService/Ping"
+	FundService_CreateFund_FullMethodName              = "/fund.FundService/CreateFund"
+	FundService_ListFunds_FullMethodName               = "/fund.FundService/ListFunds"
+	FundService_GetFund_FullMethodName                 = "/fund.FundService/GetFund"
+	FundService_UpdateFund_FullMethodName              = "/fund.FundService/UpdateFund"
+	FundService_DeleteFund_FullMethodName              = "/fund.FundService/DeleteFund"
+	FundService_InvestFund_FullMethodName              = "/fund.FundService/InvestFund"
+	FundService_WithdrawFund_FullMethodName            = "/fund.FundService/WithdrawFund"
+	FundService_CheckPendingWithdrawals_FullMethodName = "/fund.FundService/CheckPendingWithdrawals"
+	FundService_GetBankPositions_FullMethodName        = "/fund.FundService/GetBankPositions"
+	FundService_GetMyPositions_FullMethodName          = "/fund.FundService/GetMyPositions"
+	FundService_TransferFundsByManager_FullMethodName  = "/fund.FundService/TransferFundsByManager"
+	FundService_ValidateFundAccount_FullMethodName     = "/fund.FundService/ValidateFundAccount"
+	FundService_UpdateFundHolding_FullMethodName       = "/fund.FundService/UpdateFundHolding"
+	FundService_GetFundPortfolio_FullMethodName        = "/fund.FundService/GetFundPortfolio"
 )
 
 // FundServiceClient is the client API for FundService service.
@@ -46,7 +47,8 @@ type FundServiceClient interface {
 	UpdateFund(ctx context.Context, in *UpdateFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
 	DeleteFund(ctx context.Context, in *DeleteFundRequest, opts ...grpc.CallOption) (*DeleteFundResponse, error)
 	InvestFund(ctx context.Context, in *InvestFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
-	WithdrawFund(ctx context.Context, in *WithdrawFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
+	WithdrawFund(ctx context.Context, in *WithdrawFundRequest, opts ...grpc.CallOption) (*WithdrawFundResponse, error)
+	CheckPendingWithdrawals(ctx context.Context, in *CheckPendingWithdrawalsRequest, opts ...grpc.CallOption) (*CheckPendingWithdrawalsResponse, error)
 	GetBankPositions(ctx context.Context, in *GetBankPositionsRequest, opts ...grpc.CallOption) (*GetBankPositionsResponse, error)
 	GetMyPositions(ctx context.Context, in *GetMyPositionsRequest, opts ...grpc.CallOption) (*GetMyPositionsResponse, error)
 	TransferFundsByManager(ctx context.Context, in *TransferFundsByManagerRequest, opts ...grpc.CallOption) (*TransferFundsByManagerResponse, error)
@@ -133,10 +135,20 @@ func (c *fundServiceClient) InvestFund(ctx context.Context, in *InvestFundReques
 	return out, nil
 }
 
-func (c *fundServiceClient) WithdrawFund(ctx context.Context, in *WithdrawFundRequest, opts ...grpc.CallOption) (*FundResponse, error) {
+func (c *fundServiceClient) WithdrawFund(ctx context.Context, in *WithdrawFundRequest, opts ...grpc.CallOption) (*WithdrawFundResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FundResponse)
+	out := new(WithdrawFundResponse)
 	err := c.cc.Invoke(ctx, FundService_WithdrawFund_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fundServiceClient) CheckPendingWithdrawals(ctx context.Context, in *CheckPendingWithdrawalsRequest, opts ...grpc.CallOption) (*CheckPendingWithdrawalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckPendingWithdrawalsResponse)
+	err := c.cc.Invoke(ctx, FundService_CheckPendingWithdrawals_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +226,8 @@ type FundServiceServer interface {
 	UpdateFund(context.Context, *UpdateFundRequest) (*FundResponse, error)
 	DeleteFund(context.Context, *DeleteFundRequest) (*DeleteFundResponse, error)
 	InvestFund(context.Context, *InvestFundRequest) (*FundResponse, error)
-	WithdrawFund(context.Context, *WithdrawFundRequest) (*FundResponse, error)
+	WithdrawFund(context.Context, *WithdrawFundRequest) (*WithdrawFundResponse, error)
+	CheckPendingWithdrawals(context.Context, *CheckPendingWithdrawalsRequest) (*CheckPendingWithdrawalsResponse, error)
 	GetBankPositions(context.Context, *GetBankPositionsRequest) (*GetBankPositionsResponse, error)
 	GetMyPositions(context.Context, *GetMyPositionsRequest) (*GetMyPositionsResponse, error)
 	TransferFundsByManager(context.Context, *TransferFundsByManagerRequest) (*TransferFundsByManagerResponse, error)
@@ -252,8 +265,11 @@ func (UnimplementedFundServiceServer) DeleteFund(context.Context, *DeleteFundReq
 func (UnimplementedFundServiceServer) InvestFund(context.Context, *InvestFundRequest) (*FundResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvestFund not implemented")
 }
-func (UnimplementedFundServiceServer) WithdrawFund(context.Context, *WithdrawFundRequest) (*FundResponse, error) {
+func (UnimplementedFundServiceServer) WithdrawFund(context.Context, *WithdrawFundRequest) (*WithdrawFundResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method WithdrawFund not implemented")
+}
+func (UnimplementedFundServiceServer) CheckPendingWithdrawals(context.Context, *CheckPendingWithdrawalsRequest) (*CheckPendingWithdrawalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckPendingWithdrawals not implemented")
 }
 func (UnimplementedFundServiceServer) GetBankPositions(context.Context, *GetBankPositionsRequest) (*GetBankPositionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBankPositions not implemented")
@@ -438,6 +454,24 @@ func _FundService_WithdrawFund_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FundService_CheckPendingWithdrawals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckPendingWithdrawalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FundServiceServer).CheckPendingWithdrawals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FundService_CheckPendingWithdrawals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FundServiceServer).CheckPendingWithdrawals(ctx, req.(*CheckPendingWithdrawalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _FundService_GetBankPositions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetBankPositionsRequest)
 	if err := dec(in); err != nil {
@@ -584,6 +618,10 @@ var FundService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WithdrawFund",
 			Handler:    _FundService_WithdrawFund_Handler,
+		},
+		{
+			MethodName: "CheckPendingWithdrawals",
+			Handler:    _FundService_CheckPendingWithdrawals_Handler,
 		},
 		{
 			MethodName: "GetBankPositions",

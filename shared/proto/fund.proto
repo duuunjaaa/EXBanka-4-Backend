@@ -10,7 +10,8 @@ service FundService {
   rpc UpdateFund(UpdateFundRequest) returns (FundResponse);
   rpc DeleteFund(DeleteFundRequest) returns (DeleteFundResponse);
   rpc InvestFund(InvestFundRequest) returns (FundResponse);
-  rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
+  rpc WithdrawFund(WithdrawFundRequest) returns (WithdrawFundResponse);
+  rpc CheckPendingWithdrawals(CheckPendingWithdrawalsRequest) returns (CheckPendingWithdrawalsResponse);
   rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
   rpc GetMyPositions(GetMyPositionsRequest) returns (GetMyPositionsResponse);
   rpc TransferFundsByManager(TransferFundsByManagerRequest) returns (TransferFundsByManagerResponse);
@@ -87,6 +88,15 @@ message WithdrawFundRequest {
   int64  destination_account_id = 4;
   double amount                 = 5; // 0 = full position
 }
+
+message WithdrawFundResponse {
+  bool         pending = 1; // true → 202 Accepted; false → 200 OK
+  string       message = 2;
+  FundResponse fund    = 3; // populated when pending=false
+}
+
+message CheckPendingWithdrawalsRequest  { int64 fund_id   = 1; }
+message CheckPendingWithdrawalsResponse { int64 completed = 1; }
 
 // ── GetBankPositions ──────────────────────────────────────────────────────────
 

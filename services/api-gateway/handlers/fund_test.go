@@ -33,20 +33,21 @@ func makeSupervisorToken() string {
 // ---- stub fund client ----
 
 type stubFundClient struct {
-	pingFn                   func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
-	createFundFn             func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	listFundsFn              func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
-	getFundFn                func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	updateFundFn             func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	deleteFundFn             func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
-	investFundFn             func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	withdrawFundFn           func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	getBankPositionsFn       func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
-	validateFundAccountFn    func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
-	updateFundHoldingFn      func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
-	getMyPositionsFn         func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
-	transferFundsByManagerFn func(context.Context, *pb.TransferFundsByManagerRequest, ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error)
-	getFundPortfolioFn       func(context.Context, *pb.GetFundPortfolioRequest, ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error)
+	pingFn                    func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
+	createFundFn              func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	listFundsFn               func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
+	getFundFn                 func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	updateFundFn              func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	deleteFundFn              func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
+	investFundFn              func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	withdrawFundFn            func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.WithdrawFundResponse, error)
+	checkPendingWithdrawalsFn func(context.Context, *pb.CheckPendingWithdrawalsRequest, ...grpc.CallOption) (*pb.CheckPendingWithdrawalsResponse, error)
+	getBankPositionsFn        func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
+	validateFundAccountFn     func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
+	updateFundHoldingFn       func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
+	getMyPositionsFn          func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
+	transferFundsByManagerFn  func(context.Context, *pb.TransferFundsByManagerRequest, ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error)
+	getFundPortfolioFn        func(context.Context, *pb.GetFundPortfolioRequest, ...grpc.CallOption) (*pb.GetFundPortfolioResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -91,11 +92,17 @@ func (s *stubFundClient) InvestFund(ctx context.Context, in *pb.InvestFundReques
 	}
 	return nil, fmt.Errorf("not implemented")
 }
-func (s *stubFundClient) WithdrawFund(ctx context.Context, in *pb.WithdrawFundRequest, opts ...grpc.CallOption) (*pb.FundResponse, error) {
+func (s *stubFundClient) WithdrawFund(ctx context.Context, in *pb.WithdrawFundRequest, opts ...grpc.CallOption) (*pb.WithdrawFundResponse, error) {
 	if s.withdrawFundFn != nil {
 		return s.withdrawFundFn(ctx, in, opts...)
 	}
 	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubFundClient) CheckPendingWithdrawals(ctx context.Context, in *pb.CheckPendingWithdrawalsRequest, opts ...grpc.CallOption) (*pb.CheckPendingWithdrawalsResponse, error) {
+	if s.checkPendingWithdrawalsFn != nil {
+		return s.checkPendingWithdrawalsFn(ctx, in, opts...)
+	}
+	return &pb.CheckPendingWithdrawalsResponse{}, nil
 }
 func (s *stubFundClient) GetBankPositions(ctx context.Context, in *pb.GetBankPositionsRequest, opts ...grpc.CallOption) (*pb.GetBankPositionsResponse, error) {
 	if s.getBankPositionsFn != nil {
@@ -695,5 +702,65 @@ func TestSellFundSecurities_Success(t *testing.T) {
 	}
 	if resp["orderId"] != float64(55) {
 		t.Fatalf("unexpected orderId: %v", resp["orderId"])
+	}
+}
+
+// ---- WithdrawFund gateway tests ----
+
+var withdrawBody = `{"destinationAccountId":99,"amount":1000}`
+var withdrawAllBody = `{"destinationAccountId":99,"withdrawAll":true}`
+
+func TestWithdrawFund_ImmediateSuccess(t *testing.T) {
+	svc := &stubFundClient{
+		withdrawFundFn: func(_ context.Context, req *pb.WithdrawFundRequest, _ ...grpc.CallOption) (*pb.WithdrawFundResponse, error) {
+			return &pb.WithdrawFundResponse{Pending: false, Fund: sampleFund()}, nil
+		},
+	}
+	w := serveHandlerFull(WithdrawFund(svc), "POST", "/investment/funds/:id/redeem", "/investment/funds/1/redeem", withdrawBody, makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if resp["name"] != "Test Fund" {
+		t.Fatalf("unexpected name: %v", resp["name"])
+	}
+}
+
+func TestWithdrawFund_Pending202(t *testing.T) {
+	svc := &stubFundClient{
+		withdrawFundFn: func(_ context.Context, req *pb.WithdrawFundRequest, _ ...grpc.CallOption) (*pb.WithdrawFundResponse, error) {
+			return &pb.WithdrawFundResponse{Pending: true, Message: "Payment will arrive once orders are executed"}, nil
+		},
+	}
+	w := serveHandlerFull(WithdrawFund(svc), "POST", "/investment/funds/:id/redeem", "/investment/funds/1/redeem", withdrawBody, makeClientToken())
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("expected 202 got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if resp["message"] != "Payment will arrive once orders are executed" {
+		t.Fatalf("unexpected message: %v", resp["message"])
+	}
+}
+
+func TestWithdrawFund_WithdrawAll_SendsZeroAmount(t *testing.T) {
+	var capturedAmount float64
+	svc := &stubFundClient{
+		withdrawFundFn: func(_ context.Context, req *pb.WithdrawFundRequest, _ ...grpc.CallOption) (*pb.WithdrawFundResponse, error) {
+			capturedAmount = req.Amount
+			return &pb.WithdrawFundResponse{Pending: false, Fund: sampleFund()}, nil
+		},
+	}
+	w := serveHandlerFull(WithdrawFund(svc), "POST", "/investment/funds/:id/redeem", "/investment/funds/1/redeem", withdrawAllBody, makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+	if capturedAmount != 0 {
+		t.Fatalf("expected amount=0 for withdrawAll, got %v", capturedAmount)
 	}
 }

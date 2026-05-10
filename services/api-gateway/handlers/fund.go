@@ -314,10 +314,16 @@ func WithdrawFund(client pb.FundServiceClient) gin.HandlerFunc {
 		var req struct {
 			DestinationAccountId int64   `json:"destinationAccountId" binding:"required"`
 			Amount               float64 `json:"amount"`
+			WithdrawAll          bool    `json:"withdrawAll"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
+		}
+
+		amount := req.Amount
+		if req.WithdrawAll {
+			amount = 0
 		}
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
@@ -328,13 +334,17 @@ func WithdrawFund(client pb.FundServiceClient) gin.HandlerFunc {
 			ClientId:             userID,
 			ClientType:           clientType,
 			DestinationAccountId: req.DestinationAccountId,
-			Amount:               req.Amount,
+			Amount:               amount,
 		})
 		if err != nil {
 			mapFundError(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, fundToJSON(resp))
+		if resp.Pending {
+			c.JSON(http.StatusAccepted, gin.H{"message": resp.Message})
+			return
+		}
+		c.JSON(http.StatusOK, fundToJSON(resp.Fund))
 	}
 }
 
@@ -461,7 +471,7 @@ func BankRedeemFund(client pb.FundServiceClient) gin.HandlerFunc {
 			mapFundError(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, fundToJSON(resp))
+		c.JSON(http.StatusOK, fundToJSON(resp.Fund))
 	}
 }
 
