@@ -254,6 +254,7 @@ func main() {
 	r.DELETE("/investment/funds/:id", middleware.RequireRole("SUPERVISOR"), handlers.DeleteFund(fundClient))
 	r.POST("/investment/funds/:id/invest", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.InvestFund(fundClient))
 	r.POST("/investment/funds/:id/withdraw", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.WithdrawFund(fundClient))
+	r.GET("/client/funds/positions", middleware.RequireRole("CLIENT"), handlers.GetMyPositions(fundClient))
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	if err := r.Run(":8083"); err != nil {

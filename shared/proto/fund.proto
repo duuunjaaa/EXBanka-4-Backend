@@ -12,6 +12,7 @@ service FundService {
   rpc InvestFund(InvestFundRequest) returns (FundResponse);
   rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
   rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
+  rpc GetMyPositions(GetMyPositionsRequest) returns (GetMyPositionsResponse);
   rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
   rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
 }
@@ -98,6 +99,27 @@ message BankFundPosition {
 message GetBankPositionsRequest {}
 message GetBankPositionsResponse {
   repeated BankFundPosition positions = 1;
+}
+
+// ── GetMyPositions ────────────────────────────────────────────────────────────
+
+message ClientFundPosition {
+  int64  fund_id                = 1;
+  string fund_name              = 2;
+  string description            = 3;
+  double fund_value             = 4;
+  double fund_percentage        = 5;
+  double current_position_value = 6;
+  double total_invested_amount  = 7;
+  double profit                 = 8;
+  double minimum_contribution   = 9;
+}
+message GetMyPositionsRequest {
+  int64  client_id   = 1;
+  string client_type = 2;
+}
+message GetMyPositionsResponse {
+  repeated ClientFundPosition positions = 1;
 }
 
 // ── ValidateFundAccount ───────────────────────────────────────────────────────

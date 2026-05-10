@@ -31,17 +31,18 @@ func makeSupervisorToken() string {
 // ---- stub fund client ----
 
 type stubFundClient struct {
-	pingFn         func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
-	createFundFn   func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	listFundsFn    func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
-	getFundFn      func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	updateFundFn   func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	deleteFundFn   func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
-	investFundFn           func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	withdrawFundFn         func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	getBankPositionsFn     func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
-	validateFundAccountFn  func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
-	updateFundHoldingFn    func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
+	pingFn                func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
+	createFundFn          func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	listFundsFn           func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
+	getFundFn             func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	updateFundFn          func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	deleteFundFn          func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
+	investFundFn          func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	withdrawFundFn        func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	getBankPositionsFn    func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
+	validateFundAccountFn func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
+	updateFundHoldingFn   func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
+	getMyPositionsFn      func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -107,6 +108,12 @@ func (s *stubFundClient) ValidateFundAccount(ctx context.Context, in *pb.Validat
 func (s *stubFundClient) UpdateFundHolding(ctx context.Context, in *pb.UpdateFundHoldingRequest, opts ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error) {
 	if s.updateFundHoldingFn != nil {
 		return s.updateFundHoldingFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubFundClient) GetMyPositions(ctx context.Context, in *pb.GetMyPositionsRequest, opts ...grpc.CallOption) (*pb.GetMyPositionsResponse, error) {
+	if s.getMyPositionsFn != nil {
+		return s.getMyPositionsFn(ctx, in, opts...)
 	}
 	return nil, fmt.Errorf("not implemented")
 }
@@ -398,5 +405,70 @@ func TestDeleteFund_Happy(t *testing.T) {
 	}
 	if resp["message"] != "fund deleted" {
 		t.Fatalf("expected message 'fund deleted' got %v", resp["message"])
+	}
+}
+
+func TestGetMyPositions_NoToken(t *testing.T) {
+	w := serveHandlerFull(GetMyPositions(&stubFundClient{}), "GET", "/client/funds/positions", "/client/funds/positions", "", "")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", w.Code)
+	}
+}
+
+func TestGetMyPositions_Empty(t *testing.T) {
+	svc := &stubFundClient{
+		getMyPositionsFn: func(_ context.Context, _ *pb.GetMyPositionsRequest, _ ...grpc.CallOption) (*pb.GetMyPositionsResponse, error) {
+			return &pb.GetMyPositionsResponse{Positions: []*pb.ClientFundPosition{}}, nil
+		},
+	}
+	w := serveHandlerFull(GetMyPositions(svc), "GET", "/client/funds/positions", "/client/funds/positions", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp []interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp) != 0 {
+		t.Fatalf("expected empty array, got %d items", len(resp))
+	}
+}
+
+func TestGetMyPositions_Happy(t *testing.T) {
+	svc := &stubFundClient{
+		getMyPositionsFn: func(_ context.Context, req *pb.GetMyPositionsRequest, _ ...grpc.CallOption) (*pb.GetMyPositionsResponse, error) {
+			return &pb.GetMyPositionsResponse{
+				Positions: []*pb.ClientFundPosition{
+					{
+						FundId:               7,
+						FundName:             "RAF Growth Fund",
+						Description:          "A growth fund",
+						FundValue:            50000,
+						FundPercentage:       100,
+						CurrentPositionValue: 50000,
+						TotalInvestedAmount:  10000,
+						Profit:               40000,
+						MinimumContribution:  1000,
+					},
+				},
+			}, nil
+		},
+	}
+	w := serveHandlerFull(GetMyPositions(svc), "GET", "/client/funds/positions", "/client/funds/positions", "", makeClientToken())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp) != 1 {
+		t.Fatalf("expected 1 position, got %d", len(resp))
+	}
+	if resp[0]["fundName"] != "RAF Growth Fund" {
+		t.Fatalf("unexpected fundName: %v", resp[0]["fundName"])
+	}
+	if resp[0]["profit"] != float64(40000) {
+		t.Fatalf("unexpected profit: %v", resp[0]["profit"])
 	}
 }

@@ -128,7 +128,7 @@ func (m *mockExchangeClient) PreviewConversion(ctx context.Context, in *pb_excha
 func TestListingCurrency_Success(t *testing.T) {
 	secDB, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	mock.ExpectQuery(`SELECT e\.currency`).
 		WithArgs(int64(1)).
@@ -144,7 +144,7 @@ func TestListingCurrency_Success(t *testing.T) {
 func TestListingCurrency_NotFound(t *testing.T) {
 	secDB, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	mock.ExpectQuery(`SELECT e\.currency`).
 		WithArgs(int64(99)).
@@ -160,7 +160,7 @@ func TestListingCurrency_NotFound(t *testing.T) {
 func TestValidateMargin_Employee_WithMarginPermission(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	accMock.ExpectQuery(`SELECT available_balance`).
 		WithArgs(int64(42)).
@@ -178,7 +178,7 @@ func TestValidateMargin_Employee_WithMarginPermission(t *testing.T) {
 func TestValidateMargin_Employee_NoMarginPermission_Insufficient(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	accMock.ExpectQuery(`SELECT available_balance`).
 		WithArgs(int64(42)).
@@ -195,7 +195,7 @@ func TestValidateMargin_Employee_NoMarginPermission_Insufficient(t *testing.T) {
 func TestValidateMargin_Client_SufficientLoan(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	accMock.ExpectQuery(`SELECT available_balance`).
 		WithArgs(int64(10)).
@@ -213,7 +213,7 @@ func TestValidateMargin_Client_SufficientLoan(t *testing.T) {
 func TestValidateMargin_Client_InsufficientFunds(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	accMock.ExpectQuery(`SELECT available_balance`).
 		WithArgs(int64(10)).
@@ -232,11 +232,11 @@ func TestValidateMargin_Client_InsufficientFunds(t *testing.T) {
 func TestSettle_Buy_SameCurrency(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 
 	// 1. look up account currency_id
 	accMock.ExpectQuery(`SELECT currency_id FROM accounts`).
@@ -278,11 +278,11 @@ func TestSettle_Buy_SameCurrency(t *testing.T) {
 func TestSettle_Sell_SameCurrency(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 
 	accMock.ExpectQuery(`SELECT currency_id FROM accounts`).
 		WithArgs(int64(1)).
@@ -319,11 +319,11 @@ func TestSettle_Sell_SameCurrency(t *testing.T) {
 func TestSettle_Buy_InsufficientFunds(t *testing.T) {
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 
 	accMock.ExpectQuery(`SELECT currency_id FROM accounts`).
 		WithArgs(int64(1)).
@@ -348,7 +348,7 @@ func TestSettle_Buy_InsufficientFunds(t *testing.T) {
 func TestDeclineExpiredOrders_NoPendingOrders(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT id, user_id`).
 		WillReturnRows(sqlmock.NewRows([]string{
@@ -359,7 +359,7 @@ func TestDeclineExpiredOrders_NoPendingOrders(t *testing.T) {
 
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	s := &Scheduler{DB: db, SecuritiesDB: secDB}
 	s.declineExpiredOrders()
@@ -370,7 +370,7 @@ func TestDeclineExpiredOrders_NoPendingOrders(t *testing.T) {
 func TestDeclineExpiredOrders_ExpiredFutures(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pastDate := time.Now().UTC().AddDate(0, 0, -2).Format("2006-01-02")
 
@@ -387,7 +387,7 @@ func TestDeclineExpiredOrders_ExpiredFutures(t *testing.T) {
 
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	secMock.ExpectQuery(`SELECT settlement_date`).
 		WithArgs(int64(10)).

@@ -28,6 +28,7 @@ const (
 	FundService_InvestFund_FullMethodName          = "/fund.FundService/InvestFund"
 	FundService_WithdrawFund_FullMethodName        = "/fund.FundService/WithdrawFund"
 	FundService_GetBankPositions_FullMethodName    = "/fund.FundService/GetBankPositions"
+	FundService_GetMyPositions_FullMethodName      = "/fund.FundService/GetMyPositions"
 	FundService_ValidateFundAccount_FullMethodName = "/fund.FundService/ValidateFundAccount"
 	FundService_UpdateFundHolding_FullMethodName   = "/fund.FundService/UpdateFundHolding"
 )
@@ -45,6 +46,7 @@ type FundServiceClient interface {
 	InvestFund(ctx context.Context, in *InvestFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
 	WithdrawFund(ctx context.Context, in *WithdrawFundRequest, opts ...grpc.CallOption) (*FundResponse, error)
 	GetBankPositions(ctx context.Context, in *GetBankPositionsRequest, opts ...grpc.CallOption) (*GetBankPositionsResponse, error)
+	GetMyPositions(ctx context.Context, in *GetMyPositionsRequest, opts ...grpc.CallOption) (*GetMyPositionsResponse, error)
 	ValidateFundAccount(ctx context.Context, in *ValidateFundAccountRequest, opts ...grpc.CallOption) (*ValidateFundAccountResponse, error)
 	UpdateFundHolding(ctx context.Context, in *UpdateFundHoldingRequest, opts ...grpc.CallOption) (*UpdateFundHoldingResponse, error)
 }
@@ -147,6 +149,16 @@ func (c *fundServiceClient) GetBankPositions(ctx context.Context, in *GetBankPos
 	return out, nil
 }
 
+func (c *fundServiceClient) GetMyPositions(ctx context.Context, in *GetMyPositionsRequest, opts ...grpc.CallOption) (*GetMyPositionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyPositionsResponse)
+	err := c.cc.Invoke(ctx, FundService_GetMyPositions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *fundServiceClient) ValidateFundAccount(ctx context.Context, in *ValidateFundAccountRequest, opts ...grpc.CallOption) (*ValidateFundAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ValidateFundAccountResponse)
@@ -180,6 +192,7 @@ type FundServiceServer interface {
 	InvestFund(context.Context, *InvestFundRequest) (*FundResponse, error)
 	WithdrawFund(context.Context, *WithdrawFundRequest) (*FundResponse, error)
 	GetBankPositions(context.Context, *GetBankPositionsRequest) (*GetBankPositionsResponse, error)
+	GetMyPositions(context.Context, *GetMyPositionsRequest) (*GetMyPositionsResponse, error)
 	ValidateFundAccount(context.Context, *ValidateFundAccountRequest) (*ValidateFundAccountResponse, error)
 	UpdateFundHolding(context.Context, *UpdateFundHoldingRequest) (*UpdateFundHoldingResponse, error)
 	mustEmbedUnimplementedFundServiceServer()
@@ -218,6 +231,9 @@ func (UnimplementedFundServiceServer) WithdrawFund(context.Context, *WithdrawFun
 }
 func (UnimplementedFundServiceServer) GetBankPositions(context.Context, *GetBankPositionsRequest) (*GetBankPositionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBankPositions not implemented")
+}
+func (UnimplementedFundServiceServer) GetMyPositions(context.Context, *GetMyPositionsRequest) (*GetMyPositionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyPositions not implemented")
 }
 func (UnimplementedFundServiceServer) ValidateFundAccount(context.Context, *ValidateFundAccountRequest) (*ValidateFundAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateFundAccount not implemented")
@@ -408,6 +424,24 @@ func _FundService_GetBankPositions_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FundService_GetMyPositions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyPositionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FundServiceServer).GetMyPositions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FundService_GetMyPositions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FundServiceServer).GetMyPositions(ctx, req.(*GetMyPositionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _FundService_ValidateFundAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ValidateFundAccountRequest)
 	if err := dec(in); err != nil {
@@ -486,6 +520,10 @@ var FundService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBankPositions",
 			Handler:    _FundService_GetBankPositions_Handler,
+		},
+		{
+			MethodName: "GetMyPositions",
+			Handler:    _FundService_GetMyPositions_Handler,
 		},
 		{
 			MethodName: "ValidateFundAccount",

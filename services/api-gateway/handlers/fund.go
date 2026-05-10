@@ -462,3 +462,41 @@ func BankRedeemFund(client pb.FundServiceClient) gin.HandlerFunc {
 		c.JSON(http.StatusOK, fundToJSON(resp))
 	}
 }
+
+func GetMyPositions(client pb.FundServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, err := middleware.GetUserIDFromToken(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "could not extract identity from token"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		resp, err := client.GetMyPositions(ctx, &pb.GetMyPositionsRequest{
+			ClientId:   userID,
+			ClientType: "CLIENT",
+		})
+		if err != nil {
+			mapFundError(c, err)
+			return
+		}
+
+		result := make([]gin.H, 0, len(resp.Positions))
+		for _, p := range resp.Positions {
+			result = append(result, gin.H{
+				"fundId":               p.FundId,
+				"fundName":             p.FundName,
+				"description":          p.Description,
+				"fundValue":            p.FundValue,
+				"fundPercentage":       p.FundPercentage,
+				"currentPositionValue": p.CurrentPositionValue,
+				"totalInvestedAmount":  p.TotalInvestedAmount,
+				"profit":               p.Profit,
+				"minimumContribution":  p.MinimumContribution,
+			})
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
