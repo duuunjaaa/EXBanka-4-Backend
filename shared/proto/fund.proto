@@ -16,6 +16,7 @@ service FundService {
   rpc TransferFundsByManager(TransferFundsByManagerRequest) returns (TransferFundsByManagerResponse);
   rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
   rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
+  rpc GetFundPortfolio(GetFundPortfolioRequest) returns (GetFundPortfolioResponse);
 }
 
 message PingRequest {}
@@ -145,6 +146,18 @@ message ValidateFundAccountResponse {
   bool   is_liquid     = 2;
   double liquid_assets = 3;
 }
+
+// ── GetFundPortfolio ──────────────────────────────────────────────────────────
+
+message FundPortfolioPosition {
+  int64  listing_id       = 1;
+  double quantity         = 2;
+  double average_cost     = 3;
+  string acquisition_date = 4; // "YYYY-MM-DD"
+}
+
+message GetFundPortfolioRequest  { int64 fund_id = 1; }
+message GetFundPortfolioResponse { repeated FundPortfolioPosition positions = 1; }
 
 // ── UpdateFundHolding ─────────────────────────────────────────────────────────
 

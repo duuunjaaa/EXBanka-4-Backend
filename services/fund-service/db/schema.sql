@@ -21,10 +21,12 @@ CREATE TABLE IF NOT EXISTS client_fund_positions (
 );
 
 CREATE TABLE IF NOT EXISTS fund_portfolio_positions (
-    id         BIGSERIAL PRIMARY KEY,
-    fund_id    BIGINT        NOT NULL REFERENCES investment_funds(id),
-    listing_id BIGINT        NOT NULL,
-    quantity   NUMERIC(20,6) NOT NULL DEFAULT 0,
+    id               BIGSERIAL PRIMARY KEY,
+    fund_id          BIGINT        NOT NULL REFERENCES investment_funds(id),
+    listing_id       BIGINT        NOT NULL,
+    quantity         NUMERIC(20,6) NOT NULL DEFAULT 0,
+    average_cost     DECIMAL(18,4) NOT NULL DEFAULT 0,
+    acquisition_date DATE          NOT NULL DEFAULT CURRENT_DATE,
     UNIQUE(fund_id, listing_id)
 );
 

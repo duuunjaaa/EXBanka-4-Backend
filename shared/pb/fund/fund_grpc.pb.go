@@ -32,6 +32,7 @@ const (
 	FundService_TransferFundsByManager_FullMethodName = "/fund.FundService/TransferFundsByManager"
 	FundService_ValidateFundAccount_FullMethodName    = "/fund.FundService/ValidateFundAccount"
 	FundService_UpdateFundHolding_FullMethodName      = "/fund.FundService/UpdateFundHolding"
+	FundService_GetFundPortfolio_FullMethodName       = "/fund.FundService/GetFundPortfolio"
 )
 
 // FundServiceClient is the client API for FundService service.
@@ -51,6 +52,7 @@ type FundServiceClient interface {
 	TransferFundsByManager(ctx context.Context, in *TransferFundsByManagerRequest, opts ...grpc.CallOption) (*TransferFundsByManagerResponse, error)
 	ValidateFundAccount(ctx context.Context, in *ValidateFundAccountRequest, opts ...grpc.CallOption) (*ValidateFundAccountResponse, error)
 	UpdateFundHolding(ctx context.Context, in *UpdateFundHoldingRequest, opts ...grpc.CallOption) (*UpdateFundHoldingResponse, error)
+	GetFundPortfolio(ctx context.Context, in *GetFundPortfolioRequest, opts ...grpc.CallOption) (*GetFundPortfolioResponse, error)
 }
 
 type fundServiceClient struct {
@@ -191,6 +193,16 @@ func (c *fundServiceClient) UpdateFundHolding(ctx context.Context, in *UpdateFun
 	return out, nil
 }
 
+func (c *fundServiceClient) GetFundPortfolio(ctx context.Context, in *GetFundPortfolioRequest, opts ...grpc.CallOption) (*GetFundPortfolioResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFundPortfolioResponse)
+	err := c.cc.Invoke(ctx, FundService_GetFundPortfolio_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FundServiceServer is the server API for FundService service.
 // All implementations must embed UnimplementedFundServiceServer
 // for forward compatibility.
@@ -208,6 +220,7 @@ type FundServiceServer interface {
 	TransferFundsByManager(context.Context, *TransferFundsByManagerRequest) (*TransferFundsByManagerResponse, error)
 	ValidateFundAccount(context.Context, *ValidateFundAccountRequest) (*ValidateFundAccountResponse, error)
 	UpdateFundHolding(context.Context, *UpdateFundHoldingRequest) (*UpdateFundHoldingResponse, error)
+	GetFundPortfolio(context.Context, *GetFundPortfolioRequest) (*GetFundPortfolioResponse, error)
 	mustEmbedUnimplementedFundServiceServer()
 }
 
@@ -256,6 +269,9 @@ func (UnimplementedFundServiceServer) ValidateFundAccount(context.Context, *Vali
 }
 func (UnimplementedFundServiceServer) UpdateFundHolding(context.Context, *UpdateFundHoldingRequest) (*UpdateFundHoldingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateFundHolding not implemented")
+}
+func (UnimplementedFundServiceServer) GetFundPortfolio(context.Context, *GetFundPortfolioRequest) (*GetFundPortfolioResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFundPortfolio not implemented")
 }
 func (UnimplementedFundServiceServer) mustEmbedUnimplementedFundServiceServer() {}
 func (UnimplementedFundServiceServer) testEmbeddedByValue()                     {}
@@ -512,6 +528,24 @@ func _FundService_UpdateFundHolding_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FundService_GetFundPortfolio_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFundPortfolioRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FundServiceServer).GetFundPortfolio(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FundService_GetFundPortfolio_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FundServiceServer).GetFundPortfolio(ctx, req.(*GetFundPortfolioRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FundService_ServiceDesc is the grpc.ServiceDesc for FundService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -570,6 +604,10 @@ var FundService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateFundHolding",
 			Handler:    _FundService_UpdateFundHolding_Handler,
+		},
+		{
+			MethodName: "GetFundPortfolio",
+			Handler:    _FundService_GetFundPortfolio_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
