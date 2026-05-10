@@ -1,0 +1,45 @@
+name: Shared
+
+on:
+  pull_request:
+
+jobs:
+  proto-check:
+    name: Proto staleness check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shared
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: 'shared/go.mod'  #todo: treba putanja do odgovarajuceg go.mod fajla
+      - name: Install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "34.0"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Regenerate protos
+        run: |
+          for svc in account auth card client email employee exchange loan payment portfolio securities; do
+            protoc --go_out=pb/${svc} --go_opt=paths=source_relative \
+                   --go-grpc_out=pb/${svc} --go-grpc_opt=paths=source_relative \
+                   -I proto proto/${svc}.proto
+          done
+
+      - name: Check for diff
+        run: |
+          if ! git diff --exit-code pb/; then
+            echo "::error::Generated proto code is out of date. Regenerate and commit."
+            exit 1
+          fi

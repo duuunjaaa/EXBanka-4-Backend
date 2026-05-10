@@ -22,7 +22,7 @@ func newCardServer(t *testing.T) (*CardServer, sqlmock.Sqlmock, sqlmock.Sqlmock)
 	accountDB, accountMock, err := sqlmock.New()
 	require.NoError(t, err)
 	s := &CardServer{DB: db, AccountDB: accountDB}
-	t.Cleanup(func() { db.Close(); accountDB.Close() })
+	t.Cleanup(func() { _ = db.Close(); _ = accountDB.Close() })
 	return s, dbMock, accountMock
 }
 

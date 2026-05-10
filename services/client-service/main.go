@@ -5,10 +5,10 @@ import (
 	"net"
 	"os"
 
-	"google.golang.org/grpc"
 	clientdb "github.com/RAF-SI-2025/EXBanka-4-Backend/services/client-service/db"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/client-service/handlers"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/client"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -16,7 +16,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			log.Printf("client_db close: %v", err)
+		}
+	}()
 
 	lis, err := net.Listen("tcp", ":50056")
 	if err != nil {

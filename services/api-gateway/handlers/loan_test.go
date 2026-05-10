@@ -15,15 +15,15 @@ import (
 // ---- stub ----
 
 type stubLoanClient struct {
-	getClientLoansFn        func(context.Context, *loanpb.GetClientLoansRequest, ...grpc.CallOption) (*loanpb.GetClientLoansResponse, error)
-	getLoanDetailsFn        func(context.Context, *loanpb.GetLoanDetailsRequest, ...grpc.CallOption) (*loanpb.GetLoanDetailsResponse, error)
-	getLoanInstallmentsFn   func(context.Context, *loanpb.GetLoanInstallmentsRequest, ...grpc.CallOption) (*loanpb.GetLoanInstallmentsResponse, error)
-	submitLoanFn            func(context.Context, *loanpb.SubmitLoanApplicationRequest, ...grpc.CallOption) (*loanpb.SubmitLoanApplicationResponse, error)
-	approveLoanFn           func(context.Context, *loanpb.ApproveLoanRequest, ...grpc.CallOption) (*loanpb.ApproveLoanResponse, error)
-	rejectLoanFn            func(context.Context, *loanpb.RejectLoanRequest, ...grpc.CallOption) (*loanpb.RejectLoanResponse, error)
+	getClientLoansFn         func(context.Context, *loanpb.GetClientLoansRequest, ...grpc.CallOption) (*loanpb.GetClientLoansResponse, error)
+	getLoanDetailsFn         func(context.Context, *loanpb.GetLoanDetailsRequest, ...grpc.CallOption) (*loanpb.GetLoanDetailsResponse, error)
+	getLoanInstallmentsFn    func(context.Context, *loanpb.GetLoanInstallmentsRequest, ...grpc.CallOption) (*loanpb.GetLoanInstallmentsResponse, error)
+	submitLoanFn             func(context.Context, *loanpb.SubmitLoanApplicationRequest, ...grpc.CallOption) (*loanpb.SubmitLoanApplicationResponse, error)
+	approveLoanFn            func(context.Context, *loanpb.ApproveLoanRequest, ...grpc.CallOption) (*loanpb.ApproveLoanResponse, error)
+	rejectLoanFn             func(context.Context, *loanpb.RejectLoanRequest, ...grpc.CallOption) (*loanpb.RejectLoanResponse, error)
 	getAllLoanApplicationsFn func(context.Context, *loanpb.GetAllLoanApplicationsRequest, ...grpc.CallOption) (*loanpb.GetAllLoanApplicationsResponse, error)
 	getAllLoansFn            func(context.Context, *loanpb.GetAllLoansRequest, ...grpc.CallOption) (*loanpb.GetAllLoansResponse, error)
-	triggerInstallmentsFn   func(context.Context, *loanpb.TriggerInstallmentsRequest, ...grpc.CallOption) (*loanpb.TriggerInstallmentsResponse, error)
+	triggerInstallmentsFn    func(context.Context, *loanpb.TriggerInstallmentsRequest, ...grpc.CallOption) (*loanpb.TriggerInstallmentsResponse, error)
 }
 
 func (s *stubLoanClient) GetClientLoans(ctx context.Context, in *loanpb.GetClientLoansRequest, opts ...grpc.CallOption) (*loanpb.GetClientLoansResponse, error) {

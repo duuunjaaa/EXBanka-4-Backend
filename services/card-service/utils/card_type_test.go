@@ -14,10 +14,10 @@ func TestDetectCardName(t *testing.T) {
 		{"2221000000000009", "MASTERCARD"}, // prefix 2221 (lower bound)
 		{"2720000000000005", "MASTERCARD"}, // prefix 2720 (upper bound)
 		{"9891000000000001", "DINACARD"},
-		{"371449635398431", "AMERICAN_EXPRESS"},  // prefix 37, 15 digits
-		{"341234567890123", "AMERICAN_EXPRESS"},  // prefix 34, 15 digits
-		{"9999999999999999", ""},                 // unrecognized
-		{"1234567890123456", ""},                 // unrecognized prefix
+		{"371449635398431", "AMERICAN_EXPRESS"}, // prefix 37, 15 digits
+		{"341234567890123", "AMERICAN_EXPRESS"}, // prefix 34, 15 digits
+		{"9999999999999999", ""},                // unrecognized
+		{"1234567890123456", ""},                // unrecognized prefix
 	}
 	for _, c := range cases {
 		got := DetectCardName(c.number)

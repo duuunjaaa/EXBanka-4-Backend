@@ -47,7 +47,7 @@ func newServer(t *testing.T) (*AccountServer, sqlmock.Sqlmock, sqlmock.Sqlmock, 
 	exchangeDB, exchangeMock, err := sqlmock.New()
 	require.NoError(t, err)
 	s := &AccountServer{DB: db, ClientDB: clientDB, ExchangeDB: exchangeDB, EmailClient: &mockEmailClient{}}
-	t.Cleanup(func() { db.Close(); clientDB.Close(); exchangeDB.Close() })
+	t.Cleanup(func() { _ = db.Close(); _ = clientDB.Close(); _ = exchangeDB.Close() })
 	return s, dbMock, clientMock, exchangeMock
 }
 
@@ -553,9 +553,9 @@ func TestGetBankAccounts_DBError(t *testing.T) {
 
 func TestGetBankAccounts_ScanError(t *testing.T) {
 	s, dbMock, _, _ := newServer(t)
-	// Return only 1 column, but Scan expects 5 — causes scan error
-	dbMock.ExpectQuery(`SELECT account_number`).WillReturnRows(
-		sqlmock.NewRows([]string{"account_number"}).AddRow("265000000000000001"),
+	// Return only 1 column, but Scan expects 6 — causes scan error
+	dbMock.ExpectQuery(`SELECT id, account_number`).WillReturnRows(
+		sqlmock.NewRows([]string{"id"}).AddRow(int64(1)),
 	)
 	_, err := s.GetBankAccounts(context.Background(), &pb.GetBankAccountsRequest{})
 	require.Error(t, err)
@@ -564,8 +564,8 @@ func TestGetBankAccounts_ScanError(t *testing.T) {
 
 func TestGetBankAccounts_Empty(t *testing.T) {
 	s, dbMock, _, _ := newServer(t)
-	dbMock.ExpectQuery(`SELECT account_number`).WillReturnRows(
-		sqlmock.NewRows([]string{"account_number", "account_name", "balance", "available_balance", "currency_id"}),
+	dbMock.ExpectQuery(`SELECT id, account_number`).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "account_number", "account_name", "balance", "available_balance", "currency_id"}),
 	)
 	resp, err := s.GetBankAccounts(context.Background(), &pb.GetBankAccountsRequest{})
 	require.NoError(t, err)
@@ -574,9 +574,9 @@ func TestGetBankAccounts_Empty(t *testing.T) {
 
 func TestGetBankAccounts_Happy(t *testing.T) {
 	s, dbMock, _, exchangeMock := newServer(t)
-	dbMock.ExpectQuery(`SELECT account_number`).WillReturnRows(
-		sqlmock.NewRows([]string{"account_number", "account_name", "balance", "available_balance", "currency_id"}).
-			AddRow("265000000000000001", "EUR Bank", float64(1000000), float64(1000000), int64(2)),
+	dbMock.ExpectQuery(`SELECT id, account_number`).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "account_number", "account_name", "balance", "available_balance", "currency_id"}).
+			AddRow(int64(1), "265000000000000001", "EUR Bank", float64(1000000), float64(1000000), int64(2)),
 	)
 	exchangeMock.ExpectQuery(`SELECT code FROM currencies`).WillReturnRows(
 		sqlmock.NewRows([]string{"code"}).AddRow("EUR"),

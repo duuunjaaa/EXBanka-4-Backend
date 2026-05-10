@@ -629,7 +629,7 @@ func (s *AuthServer) GetClientApprovals(ctx context.Context, req *pb_auth.GetCli
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query approvals: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var approvals []*pb_auth.Approval
 	for rows.Next() {
 		var a pb_auth.Approval
@@ -731,7 +731,7 @@ func (s *AuthServer) sendApprovalPush(clientID int64, approval *pb_auth.Approval
 		log.Printf("push notification failed for client %d: %v", clientID, err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 }
 
 func approvalPushMessage(actionType string) (title, body string) {

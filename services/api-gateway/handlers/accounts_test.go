@@ -19,14 +19,14 @@ import (
 // ---- stub account service client ----
 
 type stubAccountClient struct {
-	createFn           func(context.Context, *accountpb.CreateAccountRequest, ...grpc.CallOption) (*accountpb.CreateAccountResponse, error)
-	getMyAccountsFn    func(context.Context, *accountpb.GetMyAccountsRequest, ...grpc.CallOption) (*accountpb.GetMyAccountsResponse, error)
-	getAccountFn       func(context.Context, *accountpb.GetAccountRequest, ...grpc.CallOption) (*accountpb.GetAccountResponse, error)
-	renameAccountFn    func(context.Context, *accountpb.RenameAccountRequest, ...grpc.CallOption) (*accountpb.RenameAccountResponse, error)
-	getAllAccountsFn    func(context.Context, *accountpb.GetAllAccountsRequest, ...grpc.CallOption) (*accountpb.GetAllAccountsResponse, error)
-	updateLimitsFn     func(context.Context, *accountpb.UpdateAccountLimitsRequest, ...grpc.CallOption) (*accountpb.UpdateAccountLimitsResponse, error)
-	deleteAccountFn    func(context.Context, *accountpb.DeleteAccountRequest, ...grpc.CallOption) (*accountpb.DeleteAccountResponse, error)
-	getBankAccountsFn  func(context.Context, *accountpb.GetBankAccountsRequest, ...grpc.CallOption) (*accountpb.GetBankAccountsResponse, error)
+	createFn          func(context.Context, *accountpb.CreateAccountRequest, ...grpc.CallOption) (*accountpb.CreateAccountResponse, error)
+	getMyAccountsFn   func(context.Context, *accountpb.GetMyAccountsRequest, ...grpc.CallOption) (*accountpb.GetMyAccountsResponse, error)
+	getAccountFn      func(context.Context, *accountpb.GetAccountRequest, ...grpc.CallOption) (*accountpb.GetAccountResponse, error)
+	renameAccountFn   func(context.Context, *accountpb.RenameAccountRequest, ...grpc.CallOption) (*accountpb.RenameAccountResponse, error)
+	getAllAccountsFn  func(context.Context, *accountpb.GetAllAccountsRequest, ...grpc.CallOption) (*accountpb.GetAllAccountsResponse, error)
+	updateLimitsFn    func(context.Context, *accountpb.UpdateAccountLimitsRequest, ...grpc.CallOption) (*accountpb.UpdateAccountLimitsResponse, error)
+	deleteAccountFn   func(context.Context, *accountpb.DeleteAccountRequest, ...grpc.CallOption) (*accountpb.DeleteAccountResponse, error)
+	getBankAccountsFn func(context.Context, *accountpb.GetBankAccountsRequest, ...grpc.CallOption) (*accountpb.GetBankAccountsResponse, error)
 }
 
 func (s *stubAccountClient) CreateAccount(ctx context.Context, in *accountpb.CreateAccountRequest, opts ...grpc.CallOption) (*accountpb.CreateAccountResponse, error) {
@@ -152,18 +152,6 @@ func (s *stubCardClient) ConfirmCardRequest(ctx context.Context, in *cardpb.Conf
 		return s.confirmCardRequestFn(ctx, in, opts...)
 	}
 	return nil, fmt.Errorf("not implemented")
-}
-
-// ---- helper ----
-
-func sampleAccountDetails() *accountpb.AccountDetails {
-	return &accountpb.AccountDetails{
-		AccountName:   "Tekući račun",
-		AccountNumber: "265000191399797801",
-		CurrencyCode:  "RSD",
-		AccountType:   "CURRENT",
-		Status:        "ACTIVE",
-	}
 }
 
 // ---- GetMyAccounts ----

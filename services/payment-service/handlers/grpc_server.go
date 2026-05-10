@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lib/pq"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/payment"
+	"github.com/lib/pq"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -150,7 +150,7 @@ func (s *PaymentServer) CreatePayment(ctx context.Context, req *pb.CreatePayment
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Lock the source account row and re-read balance/limits atomically.
 	// Any concurrent payment on the same account will block here until we commit.
@@ -289,7 +289,7 @@ func (s *PaymentServer) GetPaymentRecipients(ctx context.Context, req *pb.GetPay
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query payment recipients: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var recipients []*pb.PaymentRecipient
 	for rows.Next() {
@@ -307,7 +307,7 @@ func (s *PaymentServer) ReorderPaymentRecipients(ctx context.Context, req *pb.Re
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	for i, id := range req.OrderedIds {
 		if _, err := tx.ExecContext(ctx,
@@ -443,7 +443,7 @@ func (s *PaymentServer) GetPayments(ctx context.Context, req *pb.GetPaymentsRequ
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query accounts: %v", err)
 	}
-	defer accRows.Close()
+	defer func() { _ = accRows.Close() }()
 
 	var accountNumbers []string
 	for accRows.Next() {
@@ -499,7 +499,7 @@ func (s *PaymentServer) GetPayments(ctx context.Context, req *pb.GetPaymentsRequ
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query payments: %v", err)
 	}
-	defer pmRows.Close()
+	defer func() { _ = pmRows.Close() }()
 
 	accountSet := make(map[string]bool, len(accountNumbers))
 	for _, an := range accountNumbers {
@@ -699,7 +699,7 @@ func (s *PaymentServer) CreateTransfer(ctx context.Context, req *pb.CreateTransf
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Lock the source account row and re-read balance atomically.
 	// Any concurrent transfer on the same account will block here until we commit.
@@ -792,7 +792,7 @@ func (s *PaymentServer) GetTransfers(ctx context.Context, req *pb.GetTransfersRe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query accounts: %v", err)
 	}
-	defer accRows.Close()
+	defer func() { _ = accRows.Close() }()
 
 	var accountNumbers []string
 	for accRows.Next() {
@@ -817,7 +817,7 @@ func (s *PaymentServer) GetTransfers(ctx context.Context, req *pb.GetTransfersRe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query transfers: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var transfers []*pb.Transfer
 	for rows.Next() {

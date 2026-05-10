@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
 	pbcard "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/card"
-	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -398,14 +398,14 @@ func CreateAccount(accountClient pb.AccountServiceClient, cardClient pbcard.Card
 		}
 
 		grpcReq := &pb.CreateAccountRequest{
-			ClientId:        req.ClientID,
-			AccountType:     req.AccountType,
-			AccountSubtype:  req.AccountSubtype,
-			CurrencyCode:    req.CurrencyCode,
-			InitialBalance:  req.InitialBalance,
-			AccountName:     req.AccountName,
-			CreateCard:      req.CreateCard,
-			EmployeeId:      employeeID,
+			ClientId:       req.ClientID,
+			AccountType:    req.AccountType,
+			AccountSubtype: req.AccountSubtype,
+			CurrencyCode:   req.CurrencyCode,
+			InitialBalance: req.InitialBalance,
+			AccountName:    req.AccountName,
+			CreateCard:     req.CreateCard,
+			EmployeeId:     employeeID,
 		}
 		if req.CompanyData != nil {
 			grpcReq.CompanyData = &pb.CompanyData{
@@ -479,17 +479,17 @@ func CreateAccount(accountClient pb.AccountServiceClient, cardClient pbcard.Card
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
-			"id":                a.Id,
-			"accountNumber":     a.AccountNumber,
-			"accountName":       a.AccountName,
-			"ownerId":           a.OwnerId,
-			"employeeId":        a.EmployeeId,
-			"currencyCode":      a.CurrencyCode,
-			"accountType":       a.AccountType,
-			"status":            a.Status,
-			"balance":           a.Balance,
-			"availableBalance":  a.AvailableBalance,
-			"createdDate":       a.CreatedDate,
+			"id":               a.Id,
+			"accountNumber":    a.AccountNumber,
+			"accountName":      a.AccountName,
+			"ownerId":          a.OwnerId,
+			"employeeId":       a.EmployeeId,
+			"currencyCode":     a.CurrencyCode,
+			"accountType":      a.AccountType,
+			"status":           a.Status,
+			"balance":          a.Balance,
+			"availableBalance": a.AvailableBalance,
+			"createdDate":      a.CreatedDate,
 		})
 	}
 }
@@ -506,6 +506,7 @@ func GetBankAccounts(accountClient pb.AccountServiceClient) gin.HandlerFunc {
 		result := make([]gin.H, len(resp.Accounts))
 		for i, a := range resp.Accounts {
 			result[i] = gin.H{
+				"id":               a.Id,
 				"accountNumber":    a.AccountNumber,
 				"accountName":      a.AccountName,
 				"currencyCode":     a.CurrencyCode,

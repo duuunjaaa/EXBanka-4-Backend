@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
 	pbaccount "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
 	pbcard "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/card"
 	pbclient "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/client"
 	pbemail "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -386,9 +386,9 @@ func InitiateCardRequest(cardClient pbcard.CardServiceClient, clientClient pbcli
 		}
 
 		var req struct {
-			AccountNumber string `json:"accountNumber" binding:"required"`
-			CardName      string `json:"cardName"      binding:"required"`
-			ForSelf       bool   `json:"forSelf"`
+			AccountNumber    string `json:"accountNumber" binding:"required"`
+			CardName         string `json:"cardName"      binding:"required"`
+			ForSelf          bool   `json:"forSelf"`
 			AuthorizedPerson *struct {
 				FirstName   string `json:"firstName"`
 				LastName    string `json:"lastName"`

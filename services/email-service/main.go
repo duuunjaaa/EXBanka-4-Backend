@@ -11,9 +11,9 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 
-	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/email-service/handlers"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/email-service/queue"
+	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 )
 
 func mustEnv(key string) string {
@@ -52,49 +52,81 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to RabbitMQ after 20 attempts: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("rabbitmq conn close: %v", err)
+		}
+	}()
 
 	publishCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open publish channel: %v", err)
 	}
-	defer publishCh.Close()
+	defer func() {
+		if err := publishCh.Close(); err != nil {
+			log.Printf("publish channel close: %v", err)
+		}
+	}()
 
 	consumeCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open consume channel: %v", err)
 	}
-	defer consumeCh.Close()
+	defer func() {
+		if err := consumeCh.Close(); err != nil {
+			log.Printf("consume channel close: %v", err)
+		}
+	}()
 
 	resetConsumeCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open reset consume channel: %v", err)
 	}
-	defer resetConsumeCh.Close()
+	defer func() {
+		if err := resetConsumeCh.Close(); err != nil {
+			log.Printf("reset consume channel close: %v", err)
+		}
+	}()
 
 	confirmConsumeCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open confirmation consume channel: %v", err)
 	}
-	defer confirmConsumeCh.Close()
+	defer func() {
+		if err := confirmConsumeCh.Close(); err != nil {
+			log.Printf("confirm consume channel close: %v", err)
+		}
+	}()
 
 	accountCreatedConsumeCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open account created consume channel: %v", err)
 	}
-	defer accountCreatedConsumeCh.Close()
+	defer func() {
+		if err := accountCreatedConsumeCh.Close(); err != nil {
+			log.Printf("account created consume channel close: %v", err)
+		}
+	}()
 
 	cardConfirmConsumeCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open card confirmation consume channel: %v", err)
 	}
-	defer cardConfirmConsumeCh.Close()
+	defer func() {
+		if err := cardConfirmConsumeCh.Close(); err != nil {
+			log.Printf("card confirm consume channel close: %v", err)
+		}
+	}()
 
 	loanLateConsumeCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("failed to open loan late payment consume channel: %v", err)
 	}
-	defer loanLateConsumeCh.Close()
+	defer func() {
+		if err := loanLateConsumeCh.Close(); err != nil {
+			log.Printf("loan late consume channel close: %v", err)
+		}
+	}()
 
 	producer, err := queue.NewProducer(publishCh)
 	if err != nil {

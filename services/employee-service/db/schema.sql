@@ -48,6 +48,14 @@ INSERT INTO employees (id, first_name, last_name, date_of_birth, gender, email, 
 VALUES (102, 'Petar', 'Petrovic', '1991-03-10', 'M', 'petar.petrovic@banka.rs', '', '', 'petar', NULL, 'Agent', 'Retail', false, ARRAY[]::TEXT[], '0000000000006')
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO employees (first_name, last_name, date_of_birth, gender, email, phone_number, address, username, password, position, department, active, permissions, jmbg)
+SELECT 'Vasilije', 'Lupsic', '1988-03-22', 'M', 'vasa@banka.rs', '', '', 'vasilije', crypt('vasilije123', gen_salt('bf', 10)), 'Supervisor', 'Retail', true, ARRAY['SUPERVISOR'], '0000000000007'
+WHERE NOT EXISTS (SELECT 1 FROM employees WHERE username = 'vasilije');
+
+INSERT INTO employees (first_name, last_name, date_of_birth, gender, email, phone_number, address, username, password, position, department, active, permissions, jmbg)
+SELECT 'Denis', 'Elezovic', '1997-11-05', 'M', 'elezovic@banka.rs', '', '', 'denis', crypt('denis123', gen_salt('bf', 10)), 'Agent', 'Retail', true, ARRAY['AGENT'], '0000000000008'
+WHERE NOT EXISTS (SELECT 1 FROM employees WHERE username = 'denis');
+
 SELECT setval('employees_id_seq', GREATEST((SELECT MAX(id) FROM employees), 102));
 
 -- Actuary info table (issue #144)
@@ -59,3 +67,10 @@ CREATE TABLE IF NOT EXISTS actuary_info (
     used_limit    NUMERIC NOT NULL DEFAULT 0,
     need_approval BOOLEAN NOT NULL DEFAULT false
 );
+
+-- Seed actuary_info for agents only. Supervisors are identified by absence of a row here.
+INSERT INTO actuary_info (employee_id, limit_amount, used_limit, need_approval)
+SELECT id, 100000, 0, false
+FROM employees
+WHERE 'AGENT' = ANY(permissions)
+ON CONFLICT (employee_id) DO NOTHING;

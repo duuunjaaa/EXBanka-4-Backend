@@ -62,7 +62,7 @@ func TestPaginate(t *testing.T) {
 func TestGetAllClients_CountFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT COUNT").
 		WillReturnError(status.Error(codes.Internal, "db error"))
@@ -75,7 +75,7 @@ func TestGetAllClients_CountFails(t *testing.T) {
 func TestGetAllClients_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT COUNT").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int32(2)))
@@ -94,7 +94,7 @@ func TestGetAllClients_HappyPath(t *testing.T) {
 func TestGetClientById_NotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT id, first_name").
 		WillReturnRows(sqlmock.NewRows(clientColumns()))
@@ -108,7 +108,7 @@ func TestGetClientById_NotFound(t *testing.T) {
 func TestGetClientById_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT id, first_name").
 		WillReturnRows(addClientRow(sqlmock.NewRows(clientColumns())))
@@ -127,7 +127,7 @@ func TestGetClientById_HappyPath(t *testing.T) {
 func TestCreateClient_UniqueEmailViolation(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pqErr := &pq.Error{Code: "23505", Constraint: "clients_email_key"}
 	dbMock.ExpectQuery("INSERT INTO clients").WillReturnError(pqErr)
@@ -142,7 +142,7 @@ func TestCreateClient_UniqueEmailViolation(t *testing.T) {
 func TestCreateClient_UniqueUsernamneViolation(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pqErr := &pq.Error{Code: "23505", Constraint: "clients_username_key"}
 	dbMock.ExpectQuery("INSERT INTO clients").WillReturnError(pqErr)
@@ -157,7 +157,7 @@ func TestCreateClient_UniqueUsernamneViolation(t *testing.T) {
 func TestCreateClient_UniqueJmbgViolation(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pqErr := &pq.Error{Code: "23505", Constraint: "clients_jmbg_key"}
 	dbMock.ExpectQuery("INSERT INTO clients").WillReturnError(pqErr)
@@ -172,7 +172,7 @@ func TestCreateClient_UniqueJmbgViolation(t *testing.T) {
 func TestCreateClient_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("INSERT INTO clients").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
@@ -194,7 +194,7 @@ func TestCreateClient_HappyPath(t *testing.T) {
 func TestUpdateClient_NotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("UPDATE clients").
 		WillReturnRows(sqlmock.NewRows(clientColumns()))
@@ -208,7 +208,7 @@ func TestUpdateClient_NotFound(t *testing.T) {
 func TestUpdateClient_UniqueEmailViolation(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pqErr := &pq.Error{Code: "23505", Constraint: "clients_email_key"}
 	dbMock.ExpectQuery("UPDATE clients").WillReturnError(pqErr)
@@ -223,7 +223,7 @@ func TestUpdateClient_UniqueEmailViolation(t *testing.T) {
 func TestUpdateClient_UniqueUsernameViolation(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pqErr := &pq.Error{Code: "23505", Constraint: "clients_username_key"}
 	dbMock.ExpectQuery("UPDATE clients").WillReturnError(pqErr)
@@ -238,7 +238,7 @@ func TestUpdateClient_UniqueUsernameViolation(t *testing.T) {
 func TestUpdateClient_UniqueJmbgViolation(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	pqErr := &pq.Error{Code: "23505", Constraint: "clients_jmbg_key"}
 	dbMock.ExpectQuery("UPDATE clients").WillReturnError(pqErr)
@@ -253,7 +253,7 @@ func TestUpdateClient_UniqueJmbgViolation(t *testing.T) {
 func TestUpdateClient_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("UPDATE clients").
 		WillReturnRows(addClientRow(sqlmock.NewRows(clientColumns())))
@@ -275,7 +275,7 @@ func TestUpdateClient_HappyPath(t *testing.T) {
 func TestGetClientCredentials_NotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT id, password").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "password", "active"}))
@@ -289,7 +289,7 @@ func TestGetClientCredentials_NotFound(t *testing.T) {
 func TestGetClientCredentials_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT id, password").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "password", "active"}).
@@ -308,7 +308,7 @@ func TestGetClientCredentials_HappyPath(t *testing.T) {
 func TestActivateClient_NotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("UPDATE clients").
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -324,7 +324,7 @@ func TestActivateClient_NotFound(t *testing.T) {
 func TestActivateClient_DBError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("UPDATE clients").
 		WillReturnError(status.Error(codes.Internal, "db error"))
@@ -339,7 +339,7 @@ func TestActivateClient_DBError(t *testing.T) {
 func TestActivateClient_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("UPDATE clients").
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -356,7 +356,7 @@ func TestActivateClient_HappyPath(t *testing.T) {
 func TestGetAllClients_QueryFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT COUNT").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int32(1)))
@@ -370,7 +370,7 @@ func TestGetAllClients_QueryFails(t *testing.T) {
 func TestGetAllClients_ScanFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT COUNT").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int32(1)))
@@ -387,7 +387,7 @@ func TestGetAllClients_ScanFails(t *testing.T) {
 func TestGetClientById_DBError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT id, first_name").WillReturnError(sql.ErrConnDone)
 
@@ -399,7 +399,7 @@ func TestGetClientById_DBError(t *testing.T) {
 func TestCreateClient_GenericError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("INSERT INTO clients").WillReturnError(sql.ErrConnDone)
 
@@ -411,7 +411,7 @@ func TestCreateClient_GenericError(t *testing.T) {
 func TestUpdateClient_GenericError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("UPDATE clients").WillReturnError(sql.ErrConnDone)
 
@@ -423,7 +423,7 @@ func TestUpdateClient_GenericError(t *testing.T) {
 func TestGetClientCredentials_DBError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("SELECT id, password").WillReturnError(sql.ErrConnDone)
 

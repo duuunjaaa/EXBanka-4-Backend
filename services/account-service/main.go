@@ -18,25 +18,41 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to account_db: %v", err)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			log.Printf("account_db close: %v", err)
+		}
+	}()
 
 	clientDB, err := acdb.Connect(os.Getenv("CLIENT_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to client_db: %v", err)
 	}
-	defer clientDB.Close()
+	defer func() {
+		if err := clientDB.Close(); err != nil {
+			log.Printf("client_db close: %v", err)
+		}
+	}()
 
 	exchangeDB, err := acdb.Connect(os.Getenv("EXCHANGE_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to exchange_db: %v", err)
 	}
-	defer exchangeDB.Close()
+	defer func() {
+		if err := exchangeDB.Close(); err != nil {
+			log.Printf("exchange_db close: %v", err)
+		}
+	}()
 
 	emailConn, err := grpc.NewClient(os.Getenv("EMAIL_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("failed to connect to email-service: %v", err)
 	}
-	defer emailConn.Close()
+	defer func() {
+		if err := emailConn.Close(); err != nil {
+			log.Printf("email-service conn close: %v", err)
+		}
+	}()
 	emailClient := pb_email.NewEmailServiceClient(emailConn)
 
 	lis, err := net.Listen("tcp", ":50054")

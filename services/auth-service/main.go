@@ -21,13 +21,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to auth-db: %v", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	clientConn, err := grpc.NewClient(os.Getenv("CLIENT_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("failed to connect to client-service: %v", err)
 	}
-	defer clientConn.Close()
+	defer func() { _ = clientConn.Close() }()
 
 	clientClient := pb_client.NewClientServiceClient(clientConn)
 
@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to employee-service: %v", err)
 	}
-	defer empConn.Close()
+	defer func() { _ = empConn.Close() }()
 
 	employeeClient := pb_emp.NewEmployeeServiceClient(empConn)
 
@@ -43,7 +43,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to email-service: %v", err)
 	}
-	defer emailConn.Close()
+	defer func() { _ = emailConn.Close() }()
 
 	emailClient := pb_email.NewEmailServiceClient(emailConn)
 

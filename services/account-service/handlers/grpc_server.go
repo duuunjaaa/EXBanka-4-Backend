@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/account-service/utils"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
 	pb_email "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
-	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/account-service/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -31,7 +31,7 @@ func (s *AccountServer) GetMyAccounts(ctx context.Context, req *pb.GetMyAccounts
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query accounts: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type row struct {
 		id               int64
@@ -175,7 +175,7 @@ func (s *AccountServer) GetAllAccounts(ctx context.Context, _ *pb.GetAllAccounts
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query accounts: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type row struct {
 		id               int64
@@ -254,17 +254,21 @@ func accountTypeCode(accountType string) string {
 }
 
 func (s *AccountServer) CreateAccount(ctx context.Context, req *pb.CreateAccountRequest) (*pb.CreateAccountResponse, error) {
-	// 1. Validate client exists and fetch contact info for email
+	// 1. Validate client exists and fetch contact info for email.
+	// Skip for ClientId == 0 (BANK/fund accounts that have no client owner).
 	var clientID int64
 	var clientEmail, clientFirstName string
-	err := s.ClientDB.QueryRowContext(ctx,
-		`SELECT id, email, first_name FROM clients WHERE id = $1`, req.ClientId).
-		Scan(&clientID, &clientEmail, &clientFirstName)
-	if err == sql.ErrNoRows {
-		return nil, status.Errorf(codes.NotFound, "client with id %d not found", req.ClientId)
-	}
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to verify client: %v", err)
+	var err error
+	if req.ClientId != 0 {
+		err = s.ClientDB.QueryRowContext(ctx,
+			`SELECT id, email, first_name FROM clients WHERE id = $1`, req.ClientId).
+			Scan(&clientID, &clientEmail, &clientFirstName)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, "client with id %d not found", req.ClientId)
+		}
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to verify client: %v", err)
+		}
 	}
 
 	// 2. Validate currency exists and get its id
@@ -399,20 +403,20 @@ func (s *AccountServer) UpdateAccountLimits(ctx context.Context, req *pb.UpdateA
 
 func (s *AccountServer) GetBankAccounts(ctx context.Context, _ *pb.GetBankAccountsRequest) (*pb.GetBankAccountsResponse, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT account_number, account_name, balance, available_balance, currency_id
+		SELECT id, account_number, account_name, balance, available_balance, currency_id
 		FROM accounts
-		WHERE owner_id = 0 AND account_type = 'BANK'
+		WHERE owner_id = 0 AND account_type = 'BANK' AND COALESCE(account_subtype, '') != 'FUND'
 		ORDER BY currency_id`)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query bank accounts: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var accounts []*pb.BankAccountItem
 	for rows.Next() {
 		var a pb.BankAccountItem
 		var currencyID int64
-		if err := rows.Scan(&a.AccountNumber, &a.AccountName, &a.Balance, &a.AvailableBalance, &currencyID); err != nil {
+		if err := rows.Scan(&a.Id, &a.AccountNumber, &a.AccountName, &a.Balance, &a.AvailableBalance, &currencyID); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to scan bank account: %v", err)
 		}
 		_ = s.ExchangeDB.QueryRowContext(ctx, `SELECT code FROM currencies WHERE id = $1`, currencyID).Scan(&a.CurrencyCode)

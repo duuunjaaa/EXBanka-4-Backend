@@ -5,12 +5,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
+	_ "github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/docs"
 	gwgrpc "github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/grpc"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/handlers"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
-	_ "github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/docs"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -28,55 +28,85 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to client-service: %v", err)
 	}
-	defer clientConn.Close()
+	defer func() { _ = clientConn.Close() }()
 
 	employeeClient, empConn, err := gwgrpc.NewEmployeeClient(os.Getenv("EMPLOYEE_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to employee-service: %v", err)
 	}
-	defer empConn.Close()
+	defer func() { _ = empConn.Close() }()
 
 	paymentClient, pmConn, err := gwgrpc.NewPaymentClient(os.Getenv("PAYMENT_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to payment-service: %v", err)
 	}
-	defer pmConn.Close()
+	defer func() { _ = pmConn.Close() }()
 
 	accountClient, accConn, err := gwgrpc.NewAccountClient(os.Getenv("ACCOUNT_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to account-service: %v", err)
 	}
-	defer accConn.Close()
+	defer func() { _ = accConn.Close() }()
 
 	authClient, authConn, err := gwgrpc.NewAuthClient(os.Getenv("AUTH_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to auth-service: %v", err)
 	}
-	defer authConn.Close()
+	defer func() { _ = authConn.Close() }()
 
 	emailClient, emailConn, err := gwgrpc.NewEmailClient(os.Getenv("EMAIL_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to email-service: %v", err)
 	}
-	defer emailConn.Close()
+	defer func() { _ = emailConn.Close() }()
 
 	loanClient, loanConn, err := gwgrpc.NewLoanClient(os.Getenv("LOAN_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to loan-service: %v", err)
 	}
-	defer loanConn.Close()
+	defer func() { _ = loanConn.Close() }()
 
 	cardClient, cardConn, err := gwgrpc.NewCardClient(os.Getenv("CARD_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to card-service: %v", err)
 	}
-	defer cardConn.Close()
+	defer func() { _ = cardConn.Close() }()
 
 	exchangeClient, exchangeConn, err := gwgrpc.NewExchangeClient(os.Getenv("EXCHANGE_SERVICE_ADDR"))
 	if err != nil {
 		log.Fatalf("failed to connect to exchange-service: %v", err)
 	}
-	defer exchangeConn.Close()
+	defer func() { _ = exchangeConn.Close() }()
+
+	securitiesClient, securitiesConn, err := gwgrpc.NewSecuritiesClient(os.Getenv("SECURITIES_SERVICE_ADDR"))
+	if err != nil {
+		log.Fatalf("failed to connect to securities-service: %v", err)
+	}
+	defer func() { _ = securitiesConn.Close() }()
+
+	orderClient, orderConn, err := gwgrpc.NewOrderClient(os.Getenv("ORDER_SERVICE_ADDR"))
+	if err != nil {
+		log.Fatalf("failed to connect to order-service: %v", err)
+	}
+	defer func() { _ = orderConn.Close() }()
+
+	portfolioClient, portfolioConn, err := gwgrpc.NewPortfolioClient(os.Getenv("PORTFOLIO_SERVICE_ADDR"))
+	if err != nil {
+		log.Fatalf("failed to connect to portfolio-service: %v", err)
+	}
+	defer func() { _ = portfolioConn.Close() }()
+
+	otcClient, otcConn, err := gwgrpc.NewOtcClient(os.Getenv("OTC_SERVICE_ADDR"))
+	if err != nil {
+		log.Fatalf("failed to connect to otc-service: %v", err)
+	}
+	defer func() { _ = otcConn.Close() }()
+
+	fundClient, fundConn, err := gwgrpc.NewFundClient(os.Getenv("FUND_SERVICE_ADDR"))
+	if err != nil {
+		log.Fatalf("failed to connect to fund-service: %v", err)
+	}
+	defer func() { _ = fundConn.Close() }()
 
 	r := gin.Default()
 
@@ -98,6 +128,11 @@ func main() {
 	r.PUT("/api/actuaries/:id/limit", middleware.RequireRole("SUPERVISOR"), handlers.SetAgentLimit(employeeClient))
 	r.POST("/api/actuaries/:id/reset-used-limit", middleware.RequireRole("SUPERVISOR"), handlers.ResetAgentUsedLimit(employeeClient))
 	r.PUT("/api/actuaries/:id/need-approval", middleware.RequireRole("SUPERVISOR"), handlers.SetNeedApproval(employeeClient))
+	// Bank profit portal (#226, #234)
+	r.GET("/bank/profit/actuaries", middleware.RequireRole("SUPERVISOR"), handlers.GetActuaryPerformances(employeeClient, orderClient))
+	r.GET("/bank/profit/fund-positions", middleware.RequireRole("SUPERVISOR"), handlers.GetBankFundPositions(fundClient))
+	r.POST("/bank/profit/fund-positions/:fundId/invest", middleware.RequireRole("SUPERVISOR"), handlers.BankInvestFund(fundClient))
+	r.POST("/bank/profit/fund-positions/:fundId/redeem", middleware.RequireRole("SUPERVISOR"), handlers.BankRedeemFund(fundClient))
 	r.POST("/api/payments/create", handlers.CreatePayment(paymentClient))
 	r.GET("/api/payments", handlers.GetPayments(paymentClient))
 	r.GET("/api/payments/:paymentId", handlers.GetPaymentById(paymentClient))
@@ -109,15 +144,15 @@ func main() {
 	r.PUT("/api/recipients/:id", handlers.UpdatePaymentRecipient(paymentClient))
 	r.DELETE("/api/recipients/:id", handlers.DeletePaymentRecipient(paymentClient))
 	r.PUT("/api/recipients/reorder", handlers.ReorderPaymentRecipients(paymentClient))
-	r.GET("/api/accounts", middleware.RequireRole("EMPLOYEE"), handlers.GetAllAccounts(accountClient))
-	r.GET("/api/admin/accounts/:accountId", middleware.RequireRole("EMPLOYEE"), handlers.GetAccountAdmin(accountClient))
+	r.GET("/api/accounts", middleware.RequireRole("READ"), handlers.GetAllAccounts(accountClient))
+	r.GET("/api/admin/accounts/:accountId", middleware.RequireRole("READ"), handlers.GetAccountAdmin(accountClient))
 	r.GET("/api/accounts/my", handlers.GetMyAccounts(accountClient))
 	r.GET("/api/accounts/:accountId", handlers.GetAccount(accountClient))
 	r.PUT("/api/accounts/:accountId/name", handlers.RenameAccount(accountClient))
-	r.PUT("/api/accounts/:accountId/limits", middleware.RequireRole("EMPLOYEE"), handlers.UpdateAccountLimits(accountClient))
-	r.POST("/api/accounts/create", middleware.RequireRole("EMPLOYEE"), handlers.CreateAccount(accountClient, cardClient))
-	r.DELETE("/api/accounts/:accountId", middleware.RequireRole("EMPLOYEE"), handlers.DeleteAccount(accountClient))
-	r.GET("/api/bank-accounts", middleware.RequireRole("EMPLOYEE"), handlers.GetBankAccounts(accountClient))
+	r.PUT("/api/accounts/:accountId/limits", middleware.RequireRole("READ"), handlers.UpdateAccountLimits(accountClient))
+	r.POST("/api/accounts/create", middleware.RequireRole("READ"), handlers.CreateAccount(accountClient, cardClient))
+	r.DELETE("/api/accounts/:accountId", middleware.RequireRole("READ"), handlers.DeleteAccount(accountClient))
+	r.GET("/api/bank-accounts", middleware.RequireRole("ADMIN", "AGENT", "SUPERVISOR"), handlers.GetBankAccounts(accountClient))
 	r.POST("/login", handlers.Login(authClient))
 	r.POST("/refresh", handlers.Refresh(authClient))
 	r.POST("/client/login", handlers.ClientLogin(authClient))
@@ -126,10 +161,10 @@ func main() {
 	r.POST("/auth/activate", handlers.Activate(authClient))
 	r.POST("/auth/forgot-password", handlers.ForgotPassword(authClient, emailClient))
 	r.POST("/auth/reset-password", handlers.ResetPassword(authClient))
-	r.GET("/clients", middleware.RequireRole("EMPLOYEE"), handlers.GetClients(clientClient))
-	r.GET("/clients/:id", middleware.RequireRole("EMPLOYEE"), handlers.GetClientById(clientClient))
-	r.POST("/clients", middleware.RequireRole("EMPLOYEE"), handlers.CreateClient(clientClient, authClient, emailClient))
-	r.PUT("/clients/:id", middleware.RequireRole("EMPLOYEE"), handlers.UpdateClient(clientClient))
+	r.GET("/clients", middleware.RequireRole("READ"), handlers.GetClients(clientClient))
+	r.GET("/clients/:id", middleware.RequireRole("READ"), handlers.GetClientById(clientClient))
+	r.POST("/clients", middleware.RequireRole("READ"), handlers.CreateClient(clientClient, authClient, emailClient))
+	r.PUT("/clients/:id", middleware.RequireRole("READ"), handlers.UpdateClient(clientClient))
 	r.POST("/client/activate", handlers.ActivateClient(authClient))
 	r.GET("/api/approvals/:id/poll", handlers.PollLoginApproval(authClient))
 	r.POST("/api/mobile/approvals", handlers.CreateApproval(authClient))
@@ -148,21 +183,80 @@ func main() {
 	r.GET("/loans/:id", handlers.GetLoanDetails(loanClient))
 	r.GET("/loans/:id/installments", handlers.GetLoanInstallments(loanClient))
 	r.POST("/loans/apply", handlers.ApplyForLoan(loanClient))
-	r.GET("/admin/loans/applications", middleware.RequireRole("ADMIN"), handlers.GetAllLoanApplications(loanClient))
-	r.PUT("/admin/loans/:id/approve", middleware.RequireRole("ADMIN"), handlers.ApproveLoan(loanClient))
-	r.PUT("/admin/loans/:id/reject", middleware.RequireRole("ADMIN"), handlers.RejectLoan(loanClient))
-	r.GET("/admin/loans", middleware.RequireRole("ADMIN"), handlers.GetAllLoans(loanClient))
+	r.GET("/admin/loans/applications", middleware.RequireRole("ADMIN", "LOANS"), handlers.GetAllLoanApplications(loanClient))
+	r.PUT("/admin/loans/:id/approve", middleware.RequireRole("ADMIN", "LOANS"), handlers.ApproveLoan(loanClient))
+	r.PUT("/admin/loans/:id/reject", middleware.RequireRole("ADMIN", "LOANS"), handlers.RejectLoan(loanClient))
+	r.GET("/admin/loans", middleware.RequireRole("ADMIN", "LOANS"), handlers.GetAllLoans(loanClient))
 	r.POST("/admin/loans/trigger-installments", middleware.RequireRole("ADMIN"), handlers.TriggerInstallments(loanClient))
 	r.GET("/api/cards", handlers.GetMyCards(accountClient, cardClient))
-	r.GET("/api/cards/by-account/:accountNumber", middleware.RequireRole("EMPLOYEE"), handlers.GetCardsByAccount(cardClient))
+	r.GET("/api/cards/by-account/:accountNumber", middleware.RequireRole("READ"), handlers.GetCardsByAccount(cardClient))
 	r.POST("/api/cards/request", handlers.InitiateCardRequest(cardClient, clientClient, emailClient))
 	r.POST("/api/cards/request/confirm", handlers.ConfirmCardRequest(cardClient))
 	r.GET("/api/cards/id/:id", handlers.GetCardById(accountClient, cardClient))
 	r.GET("/api/cards/:number", handlers.GetCardByNumber(cardClient))
 	r.PUT("/api/cards/:id/block", handlers.BlockCard(cardClient))
-	r.PUT("/api/cards/:id/unblock", middleware.RequireRole("EMPLOYEE"), handlers.UnblockCard(cardClient))
-	r.PUT("/api/cards/:id/deactivate", middleware.RequireRole("EMPLOYEE"), handlers.DeactivateCard(cardClient))
-	r.PUT("/api/cards/:id/limit", middleware.RequireRole("EMPLOYEE"), handlers.UpdateCardLimit(cardClient))
+	r.PUT("/api/cards/:id/unblock", middleware.RequireRole("READ"), handlers.UnblockCard(cardClient))
+	r.PUT("/api/cards/:id/deactivate", middleware.RequireRole("READ"), handlers.DeactivateCard(cardClient))
+	r.PUT("/api/cards/:id/limit", middleware.RequireRole("READ"), handlers.UpdateCardLimit(cardClient))
+	r.GET("/securities", handlers.GetSecurities(securitiesClient))
+	r.GET("/securities/:id", handlers.GetSecurityById(securitiesClient))
+	r.GET("/securities/:id/history", handlers.GetSecurityHistory(securitiesClient))
+	r.GET("/stock-exchanges", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetStockExchanges(securitiesClient))
+	r.POST("/stock-exchanges", middleware.RequireRole("ADMIN"), handlers.CreateStockExchange(securitiesClient))
+	r.GET("/stock-exchanges/test-mode", middleware.RequireRole("ADMIN"), handlers.GetTestMode(securitiesClient))
+	r.POST("/stock-exchanges/test-mode", middleware.RequireRole("ADMIN"), handlers.SetTestMode(securitiesClient))
+	r.GET("/stock-exchanges/:id", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetStockExchange(securitiesClient))
+	r.PUT("/stock-exchanges/:id", middleware.RequireRole("ADMIN"), handlers.UpdateStockExchange(securitiesClient))
+	r.DELETE("/stock-exchanges/:id", middleware.RequireRole("ADMIN"), handlers.DeleteStockExchange(securitiesClient))
+	r.GET("/stock-exchanges/:id/hours", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetWorkingHours(securitiesClient))
+	r.POST("/stock-exchanges/hours", middleware.RequireRole("ADMIN"), handlers.SetWorkingHours(securitiesClient))
+	r.GET("/stock-exchanges/:id/holidays", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetHolidays(securitiesClient))
+	r.POST("/stock-exchanges/holidays", middleware.RequireRole("ADMIN"), handlers.AddHoliday(securitiesClient))
+	r.DELETE("/stock-exchanges/holidays/:polity/:date", middleware.RequireRole("ADMIN"), handlers.DeleteHoliday(securitiesClient))
+	r.GET("/stock-exchanges/:id/is-open", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.IsExchangeOpen(securitiesClient))
+	r.POST("/orders", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.CreateOrder(orderClient, fundClient))
+	r.POST("/client/orders", handlers.CreateOrder(orderClient, fundClient))
+	r.GET("/client/orders/:id", handlers.GetOrderById(orderClient))
+	r.DELETE("/client/orders/:id", handlers.CancelOrder(orderClient))
+	r.DELETE("/client/orders/:id/portions", handlers.CancelOrderPortions(orderClient))
+	r.GET("/orders", middleware.RequireRole("SUPERVISOR"), handlers.ListOrders(orderClient, employeeClient, securitiesClient))
+	r.GET("/orders/:id", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetOrderById(orderClient))
+	r.PUT("/orders/:id/approve", middleware.RequireRole("SUPERVISOR"), handlers.ApproveOrder(orderClient))
+	r.PUT("/orders/:id/decline", middleware.RequireRole("SUPERVISOR"), handlers.DeclineOrder(orderClient))
+	r.DELETE("/orders/:id/portions", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.CancelOrderPortions(orderClient))
+	r.DELETE("/orders/:id", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.CancelOrder(orderClient))
+	r.GET("/portfolio", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetPortfolio(portfolioClient, "EMPLOYEE"))
+	r.GET("/portfolio/profit", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetProfit(portfolioClient, "EMPLOYEE"))
+	r.GET("/client/portfolio", handlers.GetPortfolio(portfolioClient, "CLIENT"))
+	r.GET("/client/portfolio/profit", handlers.GetProfit(portfolioClient, "CLIENT"))
+	r.GET("/tax", middleware.RequireRole("SUPERVISOR"), handlers.GetTaxList(portfolioClient, employeeClient, clientClient))
+	r.GET("/tax/my", middleware.RequireRole("AGENT", "SUPERVISOR"), handlers.GetMyTax(portfolioClient, "EMPLOYEE"))
+	r.GET("/client/tax/my", handlers.GetMyTax(portfolioClient, "CLIENT"))
+	r.POST("/tax/collect", middleware.RequireRole("SUPERVISOR"), handlers.CollectTax(portfolioClient))
+	r.POST("/tax/collect/:userId", middleware.RequireRole("SUPERVISOR"), handlers.CollectTaxForUser(portfolioClient))
+	// OTC negotiations
+	r.POST("/otc/negotiations", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.CreateNegotiation(otcClient))
+	r.GET("/otc/negotiations", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.ListNegotiations(otcClient))
+	r.GET("/otc/negotiations/:id", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetNegotiation(otcClient))
+	r.PUT("/otc/negotiations/:id/counter", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.CounterOffer(otcClient))
+	r.PUT("/otc/negotiations/:id/accept", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.AcceptNegotiation(otcClient))
+	r.PUT("/otc/negotiations/:id/reject", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.RejectNegotiation(otcClient))
+	r.GET("/otc/contracts", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.ListContracts(otcClient))
+	r.POST("/otc/contracts/:id/exercise", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.ExerciseContract(otcClient))
+	r.GET("/otc/market", middleware.RequireRole("CLIENT", "SUPERVISOR"), handlers.GetMarket(otcClient))
+	r.PUT("/client/portfolio/:ticker/public-mode", middleware.RequireRole("CLIENT", "SUPERVISOR"), handlers.SetPublicMode(portfolioClient))
+
+	// Investment funds
+	r.POST("/investment/funds", middleware.RequireRole("SUPERVISOR"), handlers.CreateFund(fundClient))
+	r.GET("/investment/funds", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.ListFunds(fundClient))
+	r.GET("/investment/funds/:id", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFund(fundClient))
+	r.PUT("/investment/funds/:id", middleware.RequireRole("SUPERVISOR"), handlers.UpdateFund(fundClient))
+	r.DELETE("/investment/funds/:id", middleware.RequireRole("SUPERVISOR"), handlers.DeleteFund(fundClient))
+	r.POST("/investment/funds/:id/invest", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.InvestFund(fundClient))
+	r.POST("/investment/funds/:id/withdraw", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.WithdrawFund(fundClient))
+
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	r.Run(":8083")
+	if err := r.Run(":8083"); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
 }

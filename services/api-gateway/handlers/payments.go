@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/payment"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
+	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/payment"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -54,14 +54,14 @@ func CreatePayment(paymentClient pb.PaymentServiceClient) gin.HandlerFunc {
 		defer cancel()
 
 		resp, err := paymentClient.CreatePayment(ctx, &pb.CreatePaymentRequest{
-			ClientId:        clientID,
-			FromAccount:     req.FromAccount,
-			RecipientName:   req.RecipientName,
+			ClientId:         clientID,
+			FromAccount:      req.FromAccount,
+			RecipientName:    req.RecipientName,
 			RecipientAccount: req.RecipientAccount,
-			Amount:          req.Amount,
-			PaymentCode:     req.PaymentCode,
-			ReferenceNumber: req.ReferenceNumber,
-			Purpose:         req.Purpose,
+			Amount:           req.Amount,
+			PaymentCode:      req.PaymentCode,
+			ReferenceNumber:  req.ReferenceNumber,
+			Purpose:          req.Purpose,
 		})
 		if err != nil {
 			switch status.Code(err) {

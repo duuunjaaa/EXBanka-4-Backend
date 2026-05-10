@@ -55,7 +55,7 @@ func TestGenerateCardNumber_BrandDetection(t *testing.T) {
 		brand   string
 		iinCode string // must be brand-compatible
 	}{
-		{"VISA", "00001"},   // MII "4" + IIN "00001" → prefix "400001"
+		{"VISA", "00001"},             // MII "4" + IIN "00001" → prefix "400001"
 		{"AMERICAN_EXPRESS", "40001"}, // MII "3" + IIN "40001" → prefix "340001"
 	}
 	for _, c := range cases {

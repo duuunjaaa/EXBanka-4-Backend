@@ -48,13 +48,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to exchange_db: %v", err)
 	}
-	defer exchangeDB.Close()
+	defer func() {
+		if err := exchangeDB.Close(); err != nil {
+			log.Printf("exchange_db close: %v", err)
+		}
+	}()
 
 	accountDB, err := exdb.Connect(os.Getenv("ACCOUNT_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to account_db: %v", err)
 	}
-	defer accountDB.Close()
+	defer func() {
+		if err := accountDB.Close(); err != nil {
+			log.Printf("account_db close: %v", err)
+		}
+	}()
 
 	if err := migrate(exchangeDB); err != nil {
 		log.Fatalf("migration failed: %v", err)

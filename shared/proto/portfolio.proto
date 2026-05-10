@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package portfolio;
+
+option go_package = "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/portfolio";
+
+service PortfolioService {
+  rpc UpdateHolding(UpdateHoldingRequest) returns (UpdateHoldingResponse);
+  rpc GetPortfolio(GetPortfolioRequest)   returns (GetPortfolioResponse);
+  rpc GetProfit(GetProfitRequest)         returns (GetProfitResponse);
+  rpc SetPublicAmount(SetPublicAmountRequest) returns (SetPublicAmountResponse);
+  rpc SetPublicMode(SetPublicModeRequest) returns (SetPublicModeResponse);
+  rpc GetMyTax(GetMyTaxRequest)                       returns (GetMyTaxResponse);
+  rpc GetTaxList(GetTaxListRequest)                   returns (GetTaxListResponse);
+  rpc CollectTax(CollectTaxRequest)                   returns (CollectTaxResponse);
+  rpc CollectTaxForUser(CollectTaxForUserRequest)     returns (CollectTaxForUserResponse);
+}
+
+// UpdateHolding — called by order-service on each partial fill
+message UpdateHoldingRequest {
+  int64  user_id    = 1;
+  string user_type  = 2; // CLIENT or EMPLOYEE
+  int64  listing_id = 3;
+  int32  quantity   = 4;
+  double price      = 5; // price per unit at fill time
+  string direction  = 6; // BUY or SELL
+  int64  account_id = 7;
+  string asset_type  = 8; // e.g. STOCK, FOREX_PAIR, FUTURES_CONTRACT, OPTION
+}
+message UpdateHoldingResponse {}
+
+// GetPortfolio — returns all holdings for a user (implemented in #156)
+message GetPortfolioRequest {
+  int64  user_id   = 1;
+  string user_type = 2; // CLIENT or EMPLOYEE
+}
+message PortfolioEntry {
+  int64  id             = 1;
+  int64  listing_id     = 2;
+  int32  amount         = 3;
+  double buy_price      = 4;
+  string last_modified  = 5;
+  bool   is_public      = 6;
+  int32  public_amount  = 7;
+  int64  account_id     = 8;
+  string ticker         = 9;   // populated by portfolio-service from securities
+  string asset_type     = 10;  // e.g. STOCK, FOREX, FUTURE, OPTION
+  double price          = 11;  // current market price
+  double profit         = 12;  // (price - buy_price) * amount
+}
+message GetPortfolioResponse {
+  repeated PortfolioEntry entries = 1;
+}
+
+// GetProfit — returns total profit/loss (implemented in #156)
+message GetProfitRequest {
+  int64  user_id   = 1;
+  string user_type = 2; // CLIENT or EMPLOYEE
+}
+message GetProfitResponse {
+  double total_profit = 1;
+}
+
+// SetPublicAmount — set public units for a stock holding (implemented in #147)
+message SetPublicAmountRequest {
+  int64 user_id    = 1;
+  int64 listing_id = 2;
+  int32 amount     = 3;
+}
+message SetPublicAmountResponse {}
+
+message SetPublicModeRequest {
+  int64  user_id   = 1;
+  string user_type = 2;
+  string ticker    = 3;
+  bool   is_public = 4;
+}
+message SetPublicModeResponse {
+  string ticker    = 1;
+  bool   is_public = 2;
+}
+
+// Tax RPCs (#157)
+message GetMyTaxRequest {
+  int64  user_id   = 1;
+  string user_type = 2;
+}
+message GetMyTaxResponse {
+  double paid_this_year    = 1;
+  double unpaid_this_month = 2;
+}
+
+message GetTaxListRequest {
+  string user_type_filter = 1;
+  string name_filter      = 2;
+}
+message TaxDebtEntry {
+  int64  user_id  = 1;
+  string type     = 2;
+  double debt_rsd = 3;
+}
+message GetTaxListResponse {
+  repeated TaxDebtEntry entries = 1;
+}
+
+message CollectTaxRequest {}
+message CollectTaxResponse {}
+
+message CollectTaxForUserRequest {
+  int64  user_id   = 1;
+  string user_type = 2;
+}
+message CollectTaxForUserResponse {}

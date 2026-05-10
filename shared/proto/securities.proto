@@ -1,0 +1,261 @@
+syntax = "proto3";
+
+package securities;
+
+option go_package = "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities";
+
+// ── Ping (health check) ───────────────────────────────────────────────────────
+
+message PingRequest {}
+message PingResponse { string message = 1; }
+
+// ── StockExchange ─────────────────────────────────────────────────────────────
+
+message StockExchange {
+  int64  id       = 1;
+  string name     = 2;
+  string acronym  = 3;
+  string mic_code = 4;
+  string polity   = 5;
+  string currency = 6;
+  string timezone = 7;
+}
+
+message GetStockExchangesRequest {
+  int32 page      = 1; // 1-based, default 1
+  int32 page_size = 2; // default 10
+}
+message GetStockExchangesResponse {
+  repeated StockExchange exchanges = 1;
+  int32 total_count                = 2;
+}
+
+message GetStockExchangeByMICRequest  { string mic_code = 1; }
+message GetStockExchangeByMICResponse { StockExchange exchange = 1; }
+
+message GetStockExchangeByIdRequest  { int64 id = 1; }
+message GetStockExchangeByIdResponse { StockExchange exchange = 1; }
+
+message CreateStockExchangeRequest {
+  string name     = 1;
+  string acronym  = 2;
+  string mic_code = 3;
+  string polity   = 4;
+  string currency = 5;
+  string timezone = 6;
+}
+message CreateStockExchangeResponse { StockExchange exchange = 1; }
+
+message UpdateStockExchangeRequest {
+  string mic_code = 1;
+  string name     = 2;
+  string acronym  = 3;
+  string polity   = 4;
+  string currency = 5;
+  string timezone = 6;
+}
+message UpdateStockExchangeResponse { StockExchange exchange = 1; }
+
+message DeleteStockExchangeRequest  { string mic_code = 1; }
+message DeleteStockExchangeResponse {}
+
+// ── Working Hours ─────────────────────────────────────────────────────────────
+// Shared across all exchanges in the same polity (country).
+// segment: "pre_market", "regular", "post_market"
+// Times are "HH:MM" in the exchange's local timezone.
+
+message ExchangeWorkingHours {
+  int64  id         = 1;
+  string polity     = 2;
+  string segment    = 3;
+  string open_time  = 4;
+  string close_time = 5;
+}
+
+message GetWorkingHoursRequest  { string mic_code = 1; }
+message GetWorkingHoursResponse { repeated ExchangeWorkingHours hours = 1; }
+
+message SetWorkingHoursRequest {
+  string polity     = 1;
+  string segment    = 2;
+  string open_time  = 3;
+  string close_time = 4;
+}
+message SetWorkingHoursResponse { ExchangeWorkingHours hours = 1; }
+
+// ── Holidays ──────────────────────────────────────────────────────────────────
+// Shared across all exchanges in the same polity (country).
+
+message ExchangeHoliday {
+  int64  id           = 1;
+  string polity       = 2;
+  string holiday_date = 3; // "YYYY-MM-DD"
+  string description  = 4;
+}
+
+message GetHolidaysRequest  { string polity = 1; }
+message GetHolidaysResponse { repeated ExchangeHoliday holidays = 1; }
+
+message AddHolidayRequest {
+  string polity       = 1;
+  string holiday_date = 2; // "YYYY-MM-DD"
+  string description  = 3;
+}
+message AddHolidayResponse { ExchangeHoliday holiday = 1; }
+
+message DeleteHolidayRequest  { string polity = 1; string holiday_date = 2; }
+message DeleteHolidayResponse {}
+
+// ── Exchange Status ───────────────────────────────────────────────────────────
+
+message IsExchangeOpenRequest  { string mic_code = 1; }
+message IsExchangeOpenResponse {
+  string mic_code          = 1;
+  bool   is_open           = 2;
+  string segment           = 3; // "pre_market", "regular", "post_market", "test_mode", or "closed"
+  string current_time_local = 4; // "HH:MM" in exchange's local timezone
+}
+
+// ── Test Mode ─────────────────────────────────────────────────────────────────
+
+message GetTestModeRequest  {}
+message GetTestModeResponse { bool enabled = 1; }
+
+message SetTestModeRequest  { bool enabled = 1; }
+message SetTestModeResponse { bool enabled = 1; }
+
+// ── Listings ──────────────────────────────────────────────────────────────────
+
+message GetListingsRequest {
+  string type                    = 1; // STOCK, FOREX_PAIR, FUTURES_CONTRACT, OPTION — empty = all
+  string exchange_acronym_prefix = 2; // acronym prefix filter — empty = all exchanges
+  string ticker_prefix           = 3;
+  string name_search   = 4;
+  int32  page          = 5; // 1-based, default 1
+  int32  page_size     = 6; // default 10
+  string sort_by       = 7; // price, volume, change_percent, maintenance_margin
+  string sort_order    = 8; // ASC, DESC
+}
+
+message ListingSummary {
+  int64  id                  = 1;
+  string ticker              = 2;
+  string name                = 3;
+  string type                = 4;
+  string exchange_acronym    = 5;
+  double price               = 6;
+  double ask                 = 7;
+  double bid                 = 8;
+  int64  volume              = 9;
+  double change_percent      = 10;
+  double maintenance_margin  = 11;
+  double initial_margin_cost = 12;
+  double nominal_value       = 13;
+
+  // Option-specific fields (populated only when type = OPTION)
+  string option_type     = 14; // "CALL" or "PUT"
+  double strike_price    = 15;
+  string settlement_date = 16; // "YYYY-MM-DD"
+  int64  open_interest   = 17;
+}
+
+message GetListingsResponse {
+  repeated ListingSummary listings = 1;
+  int32 total_pages                = 2;
+  int64 total_elements             = 3;
+}
+
+message GetListingByIdRequest { int64 id = 1; }
+
+message DailyPriceInfo {
+  string date   = 1; // "YYYY-MM-DD"
+  double price  = 2;
+  double ask    = 3;
+  double bid    = 4;
+  double change = 5;
+  int64  volume = 6;
+}
+
+message StockDetail {
+  int64  outstanding_shares = 1;
+  double dividend_yield     = 2;
+  double market_cap         = 3; // derived: outstanding_shares × price
+}
+
+message ForexDetail {
+  string base_currency  = 1;
+  string quote_currency = 2;
+  string liquidity      = 3;
+  double nominal_value  = 4; // derived: 1000 × price
+}
+
+message FuturesDetail {
+  double contract_size   = 1;
+  string contract_unit   = 2;
+  string settlement_date = 3; // "YYYY-MM-DD"
+}
+
+message OptionDetail {
+  int64  stock_listing_id   = 1;
+  string option_type        = 2; // CALL, PUT
+  double strike_price       = 3;
+  double implied_volatility = 4;
+  int64  open_interest      = 5;
+  string settlement_date    = 6; // "YYYY-MM-DD"
+}
+
+message GetListingByIdResponse {
+  ListingSummary          summary       = 1;
+  repeated DailyPriceInfo price_history = 2; // last 30 days, descending
+  oneof detail {
+    StockDetail   stock   = 3;
+    ForexDetail   forex   = 4;
+    FuturesDetail futures = 5;
+    OptionDetail  option  = 6;
+  }
+}
+
+message GetListingHistoryRequest {
+  int64  id        = 1;
+  string from_date = 2; // "YYYY-MM-DD"
+  string to_date   = 3; // "YYYY-MM-DD"
+}
+
+message GetListingHistoryResponse {
+  repeated DailyPriceInfo history = 1;
+}
+
+// ── Service ───────────────────────────────────────────────────────────────────
+
+service SecuritiesService {
+  rpc Ping                  (PingRequest)                  returns (PingResponse);
+
+  // Stock Exchanges
+  rpc GetStockExchanges     (GetStockExchangesRequest)     returns (GetStockExchangesResponse);
+  rpc GetStockExchangeByMIC (GetStockExchangeByMICRequest) returns (GetStockExchangeByMICResponse);
+  rpc GetStockExchangeById  (GetStockExchangeByIdRequest)  returns (GetStockExchangeByIdResponse);
+  rpc CreateStockExchange   (CreateStockExchangeRequest)   returns (CreateStockExchangeResponse);
+  rpc UpdateStockExchange   (UpdateStockExchangeRequest)   returns (UpdateStockExchangeResponse);
+  rpc DeleteStockExchange   (DeleteStockExchangeRequest)   returns (DeleteStockExchangeResponse);
+
+  // Working Hours
+  rpc GetWorkingHours       (GetWorkingHoursRequest)       returns (GetWorkingHoursResponse);
+  rpc SetWorkingHours       (SetWorkingHoursRequest)       returns (SetWorkingHoursResponse);
+
+  // Holidays
+  rpc GetHolidays           (GetHolidaysRequest)           returns (GetHolidaysResponse);
+  rpc AddHoliday            (AddHolidayRequest)            returns (AddHolidayResponse);
+  rpc DeleteHoliday         (DeleteHolidayRequest)         returns (DeleteHolidayResponse);
+
+  // Status
+  rpc IsExchangeOpen        (IsExchangeOpenRequest)        returns (IsExchangeOpenResponse);
+
+  // Test Mode
+  rpc GetTestMode           (GetTestModeRequest)           returns (GetTestModeResponse);
+  rpc SetTestMode           (SetTestModeRequest)           returns (SetTestModeResponse);
+
+  // Listings
+  rpc GetListings           (GetListingsRequest)           returns (GetListingsResponse);
+  rpc GetListingById        (GetListingByIdRequest)        returns (GetListingByIdResponse);
+  rpc GetListingHistory     (GetListingHistoryRequest)     returns (GetListingHistoryResponse);
+}

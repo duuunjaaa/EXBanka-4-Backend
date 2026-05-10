@@ -1283,11 +1283,12 @@ func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
 
 type BankAccountItem struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	AccountNumber    string                 `protobuf:"bytes,1,opt,name=account_number,json=accountNumber,proto3" json:"account_number,omitempty"`
-	AccountName      string                 `protobuf:"bytes,2,opt,name=account_name,json=accountName,proto3" json:"account_name,omitempty"`
-	CurrencyCode     string                 `protobuf:"bytes,3,opt,name=currency_code,json=currencyCode,proto3" json:"currency_code,omitempty"`
-	Balance          float64                `protobuf:"fixed64,4,opt,name=balance,proto3" json:"balance,omitempty"`
-	AvailableBalance float64                `protobuf:"fixed64,5,opt,name=available_balance,json=availableBalance,proto3" json:"available_balance,omitempty"`
+	Id               int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	AccountNumber    string                 `protobuf:"bytes,2,opt,name=account_number,json=accountNumber,proto3" json:"account_number,omitempty"`
+	AccountName      string                 `protobuf:"bytes,3,opt,name=account_name,json=accountName,proto3" json:"account_name,omitempty"`
+	CurrencyCode     string                 `protobuf:"bytes,4,opt,name=currency_code,json=currencyCode,proto3" json:"currency_code,omitempty"`
+	Balance          float64                `protobuf:"fixed64,5,opt,name=balance,proto3" json:"balance,omitempty"`
+	AvailableBalance float64                `protobuf:"fixed64,6,opt,name=available_balance,json=availableBalance,proto3" json:"available_balance,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1320,6 +1321,13 @@ func (x *BankAccountItem) ProtoReflect() protoreflect.Message {
 // Deprecated: Use BankAccountItem.ProtoReflect.Descriptor instead.
 func (*BankAccountItem) Descriptor() ([]byte, []int) {
 	return file_account_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *BankAccountItem) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
 }
 
 func (x *BankAccountItem) GetAccountNumber() string {
@@ -1545,13 +1553,14 @@ const file_account_proto_rawDesc = "" +
 	"\x14DeleteAccountRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03R\taccountId\"\x17\n" +
-	"\x15DeleteAccountResponse\"\xc7\x01\n" +
-	"\x0fBankAccountItem\x12%\n" +
-	"\x0eaccount_number\x18\x01 \x01(\tR\raccountNumber\x12!\n" +
-	"\faccount_name\x18\x02 \x01(\tR\vaccountName\x12#\n" +
-	"\rcurrency_code\x18\x03 \x01(\tR\fcurrencyCode\x12\x18\n" +
-	"\abalance\x18\x04 \x01(\x01R\abalance\x12+\n" +
-	"\x11available_balance\x18\x05 \x01(\x01R\x10availableBalance\"\x18\n" +
+	"\x15DeleteAccountResponse\"\xd7\x01\n" +
+	"\x0fBankAccountItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12%\n" +
+	"\x0eaccount_number\x18\x02 \x01(\tR\raccountNumber\x12!\n" +
+	"\faccount_name\x18\x03 \x01(\tR\vaccountName\x12#\n" +
+	"\rcurrency_code\x18\x04 \x01(\tR\fcurrencyCode\x12\x18\n" +
+	"\abalance\x18\x05 \x01(\x01R\abalance\x12+\n" +
+	"\x11available_balance\x18\x06 \x01(\x01R\x10availableBalance\"\x18\n" +
 	"\x16GetBankAccountsRequest\"O\n" +
 	"\x17GetBankAccountsResponse\x124\n" +
 	"\baccounts\x18\x01 \x03(\v2\x18.account.BankAccountItemR\baccounts2\xa2\x05\n" +

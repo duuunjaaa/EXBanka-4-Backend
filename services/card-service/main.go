@@ -18,13 +18,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to card_db: %v", err)
 	}
-	defer cardDB.Close()
+	defer func() {
+		if err := cardDB.Close(); err != nil {
+			log.Printf("card_db close: %v", err)
+		}
+	}()
 
 	accountDB, err := carddb.Connect(os.Getenv("ACCOUNT_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to account_db: %v", err)
 	}
-	defer accountDB.Close()
+	defer func() {
+		if err := accountDB.Close(); err != nil {
+			log.Printf("account_db close: %v", err)
+		}
+	}()
 
 	lis, err := net.Listen("tcp", grpcPort)
 	if err != nil {

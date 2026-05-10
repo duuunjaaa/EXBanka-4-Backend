@@ -1,0 +1,21 @@
+contract_name,contract_size,contract_unit,maintenance_margin,type
+Corn,5000,bushels,700,AGRICULTURE
+Wheat,5000,bushels,1000,AGRICULTURE
+Soybeans,5000,bushels,1500,AGRICULTURE
+Live Cattle,40000,pounds,1500,MEATS
+Lean Hogs,40000,pounds,1200,MEATS
+Feeder Cattle,50000,pounds,2000,MEATS
+Crude Oil (WTI),1000,barrels,5000,ENERGY
+Natural Gas,10000,mmBtu,2000,ENERGY
+Heating Oil,42000,gallons,4000,ENERGY
+RBOB Gasoline,42000,gallons,4000,ENERGY
+Gold,100,troy oz,8000,METALS
+Silver,5000,troy oz,5000,METALS
+Copper,25000,pounds,3000,METALS
+Platinum,50,troy oz,2500,METALS
+Palladium,100,troy oz,10000,METALS
+Coffee,37500,pounds,2000,SOFTS
+Sugar #11,112000,pounds,1000,SOFTS
+Cocoa,10,metric tons,1500,SOFTS
+Cotton #2,50000,pounds,1500,SOFTS
+Orange Juice,15000,pounds,1200,SOFTS

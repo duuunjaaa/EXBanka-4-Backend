@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	authpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
 	emailpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -27,19 +27,21 @@ func init() {
 // ---- stub employee client ----
 
 type stubEmpClient struct {
-	getAllFn              func(context.Context, *pb.GetAllEmployeesRequest, ...grpc.CallOption) (*pb.GetAllEmployeesResponse, error)
-	searchFn             func(context.Context, *pb.SearchEmployeesRequest, ...grpc.CallOption) (*pb.SearchEmployeesResponse, error)
-	credentialsFn        func(context.Context, *pb.GetEmployeeCredentialsRequest, ...grpc.CallOption) (*pb.GetEmployeeCredentialsResponse, error)
-	createFn             func(context.Context, *pb.CreateEmployeeRequest, ...grpc.CallOption) (*pb.CreateEmployeeResponse, error)
-	getByIdFn            func(context.Context, *pb.GetEmployeeByIdRequest, ...grpc.CallOption) (*pb.GetEmployeeByIdResponse, error)
-	updateFn             func(context.Context, *pb.UpdateEmployeeRequest, ...grpc.CallOption) (*pb.UpdateEmployeeResponse, error)
-	activateFn           func(context.Context, *pb.ActivateEmployeeRequest, ...grpc.CallOption) (*pb.ActivateEmployeeResponse, error)
-	getByEmailFn         func(context.Context, *pb.GetEmployeeByEmailRequest, ...grpc.CallOption) (*pb.GetEmployeeByEmailResponse, error)
-	updatePasswordFn     func(context.Context, *pb.UpdatePasswordRequest, ...grpc.CallOption) (*pb.UpdatePasswordResponse, error)
-	getActuariesFn       func(context.Context, *pb.GetActuariesRequest, ...grpc.CallOption) (*pb.GetActuariesResponse, error)
-	setAgentLimitFn      func(context.Context, *pb.SetAgentLimitRequest, ...grpc.CallOption) (*pb.SetAgentLimitResponse, error)
-	resetUsedLimitFn     func(context.Context, *pb.ResetAgentUsedLimitRequest, ...grpc.CallOption) (*pb.ResetAgentUsedLimitResponse, error)
-	setNeedApprovalFn    func(context.Context, *pb.SetNeedApprovalRequest, ...grpc.CallOption) (*pb.SetNeedApprovalResponse, error)
+	getAllFn                    func(context.Context, *pb.GetAllEmployeesRequest, ...grpc.CallOption) (*pb.GetAllEmployeesResponse, error)
+	searchFn                    func(context.Context, *pb.SearchEmployeesRequest, ...grpc.CallOption) (*pb.SearchEmployeesResponse, error)
+	credentialsFn               func(context.Context, *pb.GetEmployeeCredentialsRequest, ...grpc.CallOption) (*pb.GetEmployeeCredentialsResponse, error)
+	createFn                    func(context.Context, *pb.CreateEmployeeRequest, ...grpc.CallOption) (*pb.CreateEmployeeResponse, error)
+	getByIdFn                   func(context.Context, *pb.GetEmployeeByIdRequest, ...grpc.CallOption) (*pb.GetEmployeeByIdResponse, error)
+	updateFn                    func(context.Context, *pb.UpdateEmployeeRequest, ...grpc.CallOption) (*pb.UpdateEmployeeResponse, error)
+	activateFn                  func(context.Context, *pb.ActivateEmployeeRequest, ...grpc.CallOption) (*pb.ActivateEmployeeResponse, error)
+	getByEmailFn                func(context.Context, *pb.GetEmployeeByEmailRequest, ...grpc.CallOption) (*pb.GetEmployeeByEmailResponse, error)
+	updatePasswordFn            func(context.Context, *pb.UpdatePasswordRequest, ...grpc.CallOption) (*pb.UpdatePasswordResponse, error)
+	getActuariesFn              func(context.Context, *pb.GetActuariesRequest, ...grpc.CallOption) (*pb.GetActuariesResponse, error)
+	setAgentLimitFn             func(context.Context, *pb.SetAgentLimitRequest, ...grpc.CallOption) (*pb.SetAgentLimitResponse, error)
+	resetUsedLimitFn            func(context.Context, *pb.ResetAgentUsedLimitRequest, ...grpc.CallOption) (*pb.ResetAgentUsedLimitResponse, error)
+	setNeedApprovalFn           func(context.Context, *pb.SetNeedApprovalRequest, ...grpc.CallOption) (*pb.SetNeedApprovalResponse, error)
+	resetAllActuaryUsedLimitsFn func(context.Context, *pb.ResetAllActuaryUsedLimitsRequest, ...grpc.CallOption) (*pb.ResetAllActuaryUsedLimitsResponse, error)
+	getActuaryPerformersFn      func(context.Context, *pb.GetActuaryPerformersRequest, ...grpc.CallOption) (*pb.GetActuaryPerformersResponse, error)
 }
 
 func (s *stubEmpClient) GetAllEmployees(ctx context.Context, in *pb.GetAllEmployeesRequest, opts ...grpc.CallOption) (*pb.GetAllEmployeesResponse, error) {
@@ -105,27 +107,39 @@ func (s *stubEmpClient) SetNeedApproval(ctx context.Context, in *pb.SetNeedAppro
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubEmpClient) ResetAllActuaryUsedLimits(ctx context.Context, in *pb.ResetAllActuaryUsedLimitsRequest, opts ...grpc.CallOption) (*pb.ResetAllActuaryUsedLimitsResponse, error) {
+	if s.resetAllActuaryUsedLimitsFn != nil {
+		return s.resetAllActuaryUsedLimitsFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubEmpClient) GetActuaryPerformers(ctx context.Context, in *pb.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb.GetActuaryPerformersResponse, error) {
+	if s.getActuaryPerformersFn != nil {
+		return s.getActuaryPerformersFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
 
 // ---- stub auth client ----
 
 type stubAuthClient struct {
-	createActivationTokenFn    func(context.Context, *authpb.CreateActivationTokenRequest, ...grpc.CallOption) (*authpb.CreateActivationTokenResponse, error)
-	loginFn                    func(context.Context, *authpb.LoginRequest, ...grpc.CallOption) (*authpb.LoginResponse, error)
-	refreshFn                  func(context.Context, *authpb.RefreshRequest, ...grpc.CallOption) (*authpb.RefreshResponse, error)
-	activateAccountFn          func(context.Context, *authpb.ActivateAccountRequest, ...grpc.CallOption) (*authpb.ActivateAccountResponse, error)
-	requestPasswordResetFn     func(context.Context, *authpb.RequestPasswordResetRequest, ...grpc.CallOption) (*authpb.RequestPasswordResetResponse, error)
-	resetPasswordFn            func(context.Context, *authpb.ResetPasswordRequest, ...grpc.CallOption) (*authpb.ResetPasswordResponse, error)
-	clientLoginFn              func(context.Context, *authpb.ClientLoginRequest, ...grpc.CallOption) (*authpb.ClientLoginResponse, error)
-	clientRefreshFn            func(context.Context, *authpb.ClientRefreshRequest, ...grpc.CallOption) (*authpb.ClientRefreshResponse, error)
-	activateClientFn           func(context.Context, *authpb.ActivateClientRequest, ...grpc.CallOption) (*authpb.ActivateClientResponse, error)
-	pollApprovalFn             func(context.Context, *authpb.PollApprovalRequest, ...grpc.CallOption) (*authpb.PollApprovalResponse, error)
-	createApprovalFn           func(context.Context, *authpb.CreateApprovalRequest, ...grpc.CallOption) (*authpb.CreateApprovalResponse, error)
-	getApprovalFn              func(context.Context, *authpb.GetApprovalRequest, ...grpc.CallOption) (*authpb.GetApprovalResponse, error)
-	getClientApprovalsFn       func(context.Context, *authpb.GetClientApprovalsRequest, ...grpc.CallOption) (*authpb.GetClientApprovalsResponse, error)
-	updateApprovalStatusFn     func(context.Context, *authpb.UpdateApprovalStatusRequest, ...grpc.CallOption) (*authpb.UpdateApprovalStatusResponse, error)
-	registerPushTokenFn        func(context.Context, *authpb.RegisterPushTokenRequest, ...grpc.CallOption) (*authpb.RegisterPushTokenResponse, error)
-	unregisterPushTokenFn      func(context.Context, *authpb.UnregisterPushTokenRequest, ...grpc.CallOption) (*authpb.UnregisterPushTokenResponse, error)
-	getPushTokenFn             func(context.Context, *authpb.GetPushTokenRequest, ...grpc.CallOption) (*authpb.GetPushTokenResponse, error)
+	createActivationTokenFn       func(context.Context, *authpb.CreateActivationTokenRequest, ...grpc.CallOption) (*authpb.CreateActivationTokenResponse, error)
+	loginFn                       func(context.Context, *authpb.LoginRequest, ...grpc.CallOption) (*authpb.LoginResponse, error)
+	refreshFn                     func(context.Context, *authpb.RefreshRequest, ...grpc.CallOption) (*authpb.RefreshResponse, error)
+	activateAccountFn             func(context.Context, *authpb.ActivateAccountRequest, ...grpc.CallOption) (*authpb.ActivateAccountResponse, error)
+	requestPasswordResetFn        func(context.Context, *authpb.RequestPasswordResetRequest, ...grpc.CallOption) (*authpb.RequestPasswordResetResponse, error)
+	resetPasswordFn               func(context.Context, *authpb.ResetPasswordRequest, ...grpc.CallOption) (*authpb.ResetPasswordResponse, error)
+	clientLoginFn                 func(context.Context, *authpb.ClientLoginRequest, ...grpc.CallOption) (*authpb.ClientLoginResponse, error)
+	clientRefreshFn               func(context.Context, *authpb.ClientRefreshRequest, ...grpc.CallOption) (*authpb.ClientRefreshResponse, error)
+	activateClientFn              func(context.Context, *authpb.ActivateClientRequest, ...grpc.CallOption) (*authpb.ActivateClientResponse, error)
+	pollApprovalFn                func(context.Context, *authpb.PollApprovalRequest, ...grpc.CallOption) (*authpb.PollApprovalResponse, error)
+	createApprovalFn              func(context.Context, *authpb.CreateApprovalRequest, ...grpc.CallOption) (*authpb.CreateApprovalResponse, error)
+	getApprovalFn                 func(context.Context, *authpb.GetApprovalRequest, ...grpc.CallOption) (*authpb.GetApprovalResponse, error)
+	getClientApprovalsFn          func(context.Context, *authpb.GetClientApprovalsRequest, ...grpc.CallOption) (*authpb.GetClientApprovalsResponse, error)
+	updateApprovalStatusFn        func(context.Context, *authpb.UpdateApprovalStatusRequest, ...grpc.CallOption) (*authpb.UpdateApprovalStatusResponse, error)
+	registerPushTokenFn           func(context.Context, *authpb.RegisterPushTokenRequest, ...grpc.CallOption) (*authpb.RegisterPushTokenResponse, error)
+	unregisterPushTokenFn         func(context.Context, *authpb.UnregisterPushTokenRequest, ...grpc.CallOption) (*authpb.UnregisterPushTokenResponse, error)
+	getPushTokenFn                func(context.Context, *authpb.GetPushTokenRequest, ...grpc.CallOption) (*authpb.GetPushTokenResponse, error)
 	createClientActivationTokenFn func(context.Context, *authpb.CreateClientActivationTokenRequest, ...grpc.CallOption) (*authpb.CreateClientActivationTokenResponse, error)
 }
 

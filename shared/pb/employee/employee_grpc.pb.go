@@ -19,19 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	EmployeeService_GetAllEmployees_FullMethodName        = "/employee.EmployeeService/GetAllEmployees"
-	EmployeeService_SearchEmployees_FullMethodName        = "/employee.EmployeeService/SearchEmployees"
-	EmployeeService_GetEmployeeCredentials_FullMethodName = "/employee.EmployeeService/GetEmployeeCredentials"
-	EmployeeService_CreateEmployee_FullMethodName         = "/employee.EmployeeService/CreateEmployee"
-	EmployeeService_GetEmployeeById_FullMethodName        = "/employee.EmployeeService/GetEmployeeById"
-	EmployeeService_UpdateEmployee_FullMethodName         = "/employee.EmployeeService/UpdateEmployee"
-	EmployeeService_ActivateEmployee_FullMethodName       = "/employee.EmployeeService/ActivateEmployee"
-	EmployeeService_GetEmployeeByEmail_FullMethodName     = "/employee.EmployeeService/GetEmployeeByEmail"
-	EmployeeService_UpdatePassword_FullMethodName         = "/employee.EmployeeService/UpdatePassword"
-	EmployeeService_GetActuaries_FullMethodName           = "/employee.EmployeeService/GetActuaries"
-	EmployeeService_SetAgentLimit_FullMethodName          = "/employee.EmployeeService/SetAgentLimit"
-	EmployeeService_ResetAgentUsedLimit_FullMethodName    = "/employee.EmployeeService/ResetAgentUsedLimit"
-	EmployeeService_SetNeedApproval_FullMethodName        = "/employee.EmployeeService/SetNeedApproval"
+	EmployeeService_GetAllEmployees_FullMethodName           = "/employee.EmployeeService/GetAllEmployees"
+	EmployeeService_SearchEmployees_FullMethodName           = "/employee.EmployeeService/SearchEmployees"
+	EmployeeService_GetEmployeeCredentials_FullMethodName    = "/employee.EmployeeService/GetEmployeeCredentials"
+	EmployeeService_CreateEmployee_FullMethodName            = "/employee.EmployeeService/CreateEmployee"
+	EmployeeService_GetEmployeeById_FullMethodName           = "/employee.EmployeeService/GetEmployeeById"
+	EmployeeService_UpdateEmployee_FullMethodName            = "/employee.EmployeeService/UpdateEmployee"
+	EmployeeService_ActivateEmployee_FullMethodName          = "/employee.EmployeeService/ActivateEmployee"
+	EmployeeService_GetEmployeeByEmail_FullMethodName        = "/employee.EmployeeService/GetEmployeeByEmail"
+	EmployeeService_UpdatePassword_FullMethodName            = "/employee.EmployeeService/UpdatePassword"
+	EmployeeService_GetActuaries_FullMethodName              = "/employee.EmployeeService/GetActuaries"
+	EmployeeService_SetAgentLimit_FullMethodName             = "/employee.EmployeeService/SetAgentLimit"
+	EmployeeService_ResetAgentUsedLimit_FullMethodName       = "/employee.EmployeeService/ResetAgentUsedLimit"
+	EmployeeService_SetNeedApproval_FullMethodName           = "/employee.EmployeeService/SetNeedApproval"
+	EmployeeService_ResetAllActuaryUsedLimits_FullMethodName = "/employee.EmployeeService/ResetAllActuaryUsedLimits"
+	EmployeeService_GetActuaryPerformers_FullMethodName      = "/employee.EmployeeService/GetActuaryPerformers"
 )
 
 // EmployeeServiceClient is the client API for EmployeeService service.
@@ -51,6 +53,8 @@ type EmployeeServiceClient interface {
 	SetAgentLimit(ctx context.Context, in *SetAgentLimitRequest, opts ...grpc.CallOption) (*SetAgentLimitResponse, error)
 	ResetAgentUsedLimit(ctx context.Context, in *ResetAgentUsedLimitRequest, opts ...grpc.CallOption) (*ResetAgentUsedLimitResponse, error)
 	SetNeedApproval(ctx context.Context, in *SetNeedApprovalRequest, opts ...grpc.CallOption) (*SetNeedApprovalResponse, error)
+	ResetAllActuaryUsedLimits(ctx context.Context, in *ResetAllActuaryUsedLimitsRequest, opts ...grpc.CallOption) (*ResetAllActuaryUsedLimitsResponse, error)
+	GetActuaryPerformers(ctx context.Context, in *GetActuaryPerformersRequest, opts ...grpc.CallOption) (*GetActuaryPerformersResponse, error)
 }
 
 type employeeServiceClient struct {
@@ -191,6 +195,26 @@ func (c *employeeServiceClient) SetNeedApproval(ctx context.Context, in *SetNeed
 	return out, nil
 }
 
+func (c *employeeServiceClient) ResetAllActuaryUsedLimits(ctx context.Context, in *ResetAllActuaryUsedLimitsRequest, opts ...grpc.CallOption) (*ResetAllActuaryUsedLimitsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetAllActuaryUsedLimitsResponse)
+	err := c.cc.Invoke(ctx, EmployeeService_ResetAllActuaryUsedLimits_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *employeeServiceClient) GetActuaryPerformers(ctx context.Context, in *GetActuaryPerformersRequest, opts ...grpc.CallOption) (*GetActuaryPerformersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetActuaryPerformersResponse)
+	err := c.cc.Invoke(ctx, EmployeeService_GetActuaryPerformers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EmployeeServiceServer is the server API for EmployeeService service.
 // All implementations must embed UnimplementedEmployeeServiceServer
 // for forward compatibility.
@@ -208,6 +232,8 @@ type EmployeeServiceServer interface {
 	SetAgentLimit(context.Context, *SetAgentLimitRequest) (*SetAgentLimitResponse, error)
 	ResetAgentUsedLimit(context.Context, *ResetAgentUsedLimitRequest) (*ResetAgentUsedLimitResponse, error)
 	SetNeedApproval(context.Context, *SetNeedApprovalRequest) (*SetNeedApprovalResponse, error)
+	ResetAllActuaryUsedLimits(context.Context, *ResetAllActuaryUsedLimitsRequest) (*ResetAllActuaryUsedLimitsResponse, error)
+	GetActuaryPerformers(context.Context, *GetActuaryPerformersRequest) (*GetActuaryPerformersResponse, error)
 	mustEmbedUnimplementedEmployeeServiceServer()
 }
 
@@ -256,6 +282,12 @@ func (UnimplementedEmployeeServiceServer) ResetAgentUsedLimit(context.Context, *
 }
 func (UnimplementedEmployeeServiceServer) SetNeedApproval(context.Context, *SetNeedApprovalRequest) (*SetNeedApprovalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetNeedApproval not implemented")
+}
+func (UnimplementedEmployeeServiceServer) ResetAllActuaryUsedLimits(context.Context, *ResetAllActuaryUsedLimitsRequest) (*ResetAllActuaryUsedLimitsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResetAllActuaryUsedLimits not implemented")
+}
+func (UnimplementedEmployeeServiceServer) GetActuaryPerformers(context.Context, *GetActuaryPerformersRequest) (*GetActuaryPerformersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetActuaryPerformers not implemented")
 }
 func (UnimplementedEmployeeServiceServer) mustEmbedUnimplementedEmployeeServiceServer() {}
 func (UnimplementedEmployeeServiceServer) testEmbeddedByValue()                         {}
@@ -512,6 +544,42 @@ func _EmployeeService_SetNeedApproval_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EmployeeService_ResetAllActuaryUsedLimits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetAllActuaryUsedLimitsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmployeeServiceServer).ResetAllActuaryUsedLimits(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmployeeService_ResetAllActuaryUsedLimits_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmployeeServiceServer).ResetAllActuaryUsedLimits(ctx, req.(*ResetAllActuaryUsedLimitsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EmployeeService_GetActuaryPerformers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActuaryPerformersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmployeeServiceServer).GetActuaryPerformers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmployeeService_GetActuaryPerformers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmployeeServiceServer).GetActuaryPerformers(ctx, req.(*GetActuaryPerformersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EmployeeService_ServiceDesc is the grpc.ServiceDesc for EmployeeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -570,6 +638,14 @@ var EmployeeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetNeedApproval",
 			Handler:    _EmployeeService_SetNeedApproval_Handler,
+		},
+		{
+			MethodName: "ResetAllActuaryUsedLimits",
+			Handler:    _EmployeeService_ResetAllActuaryUsedLimits_Handler,
+		},
+		{
+			MethodName: "GetActuaryPerformers",
+			Handler:    _EmployeeService_GetActuaryPerformers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

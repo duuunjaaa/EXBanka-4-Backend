@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
-	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
-	pb_payment "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/payment"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
+	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
+	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
+	pb_payment "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/payment"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -201,13 +201,13 @@ func ApproveApproval(authClient pb.AuthServiceClient, accountClient pb_account.A
 			}
 		case "PAYMENT":
 			var p struct {
-				FromAccount     string  `json:"fromAccount"`
-				RecipientName   string  `json:"recipientName"`
-				RecipientAccount string `json:"recipientAccount"`
-				Amount          float64 `json:"amount"`
-				PaymentCode     string  `json:"paymentCode"`
-				ReferenceNumber string  `json:"referenceNumber"`
-				Purpose         string  `json:"purpose"`
+				FromAccount      string  `json:"fromAccount"`
+				RecipientName    string  `json:"recipientName"`
+				RecipientAccount string  `json:"recipientAccount"`
+				Amount           float64 `json:"amount"`
+				PaymentCode      string  `json:"paymentCode"`
+				ReferenceNumber  string  `json:"referenceNumber"`
+				Purpose          string  `json:"purpose"`
 			}
 			if json.Unmarshal([]byte(resp.Approval.Payload), &p) == nil && p.FromAccount != "" {
 				sCtx, sCancel := context.WithTimeout(context.Background(), 10*time.Second)

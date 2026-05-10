@@ -68,3 +68,8 @@ VALUES
   ('BANK-CAD-001', 'Bank Internal CAD Account', 0, 0, 7, 'BANK', 10000000,   10000000),
   ('BANK-AUD-001', 'Bank Internal AUD Account', 0, 0, 8, 'BANK', 10000000,   10000000)
 ON CONFLICT (account_number) DO NOTHING;
+
+-- State government account — receives collected capital gains tax (issue #157)
+INSERT INTO accounts (account_number, account_name, owner_id, employee_id, currency_id, account_type, balance, available_balance)
+VALUES ('STATE-RSD-001', 'State RSD Account', 0, 0, 1, 'STATE', 0, 0)
+ON CONFLICT (account_number) DO NOTHING;

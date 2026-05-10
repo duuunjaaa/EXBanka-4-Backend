@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/lib/pq"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	"github.com/lib/pq"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -59,7 +59,7 @@ func (s *EmployeeServer) GetAllEmployees(ctx context.Context, req *pb.GetAllEmpl
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var employees []*pb.Employee
 	for rows.Next() {
@@ -106,7 +106,7 @@ func (s *EmployeeServer) SearchEmployees(ctx context.Context, req *pb.SearchEmpl
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var employees []*pb.Employee
 	for rows.Next() {
@@ -391,7 +391,7 @@ func (s *EmployeeServer) GetActuaries(ctx context.Context, req *pb.GetActuariesR
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var actuaries []*pb.ActuaryInfo
 	for rows.Next() {
@@ -484,4 +484,45 @@ func (s *EmployeeServer) SetNeedApproval(ctx context.Context, req *pb.SetNeedApp
 		return nil, status.Error(codes.NotFound, "actuary info not found")
 	}
 	return &pb.SetNeedApprovalResponse{}, nil
+}
+
+func (s *EmployeeServer) ResetAllActuaryUsedLimits(ctx context.Context, _ *pb.ResetAllActuaryUsedLimitsRequest) (*pb.ResetAllActuaryUsedLimitsResponse, error) {
+	_, err := s.DB.ExecContext(ctx, `UPDATE actuary_info SET used_limit = 0`)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "reset all actuary used limits: %v", err)
+	}
+	return &pb.ResetAllActuaryUsedLimitsResponse{}, nil
+}
+
+// GetActuaryPerformers returns all employees with AGENT, SUPERVISOR, or ADMIN permission.
+// Used by the bank profit portal to show per-actuary realized P&L (#226).
+func (s *EmployeeServer) GetActuaryPerformers(ctx context.Context, _ *pb.GetActuaryPerformersRequest) (*pb.GetActuaryPerformersResponse, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT id, first_name, last_name,
+		       CASE
+		           WHEN 'ADMIN'      = ANY(permissions) THEN 'ADMIN'
+		           WHEN 'SUPERVISOR' = ANY(permissions) THEN 'SUPERVISOR'
+		           ELSE 'AGENT'
+		       END AS position
+		FROM employees
+		WHERE ('AGENT' = ANY(permissions) OR 'SUPERVISOR' = ANY(permissions) OR 'ADMIN' = ANY(permissions))
+		  AND active = TRUE
+		ORDER BY last_name, first_name`)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get actuary performers: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var performers []*pb.ActuaryPerformer
+	for rows.Next() {
+		var p pb.ActuaryPerformer
+		if err := rows.Scan(&p.UserId, &p.FirstName, &p.LastName, &p.Position); err != nil {
+			return nil, status.Errorf(codes.Internal, "scan actuary performer: %v", err)
+		}
+		performers = append(performers, &p)
+	}
+	if performers == nil {
+		performers = []*pb.ActuaryPerformer{}
+	}
+	return &pb.GetActuaryPerformersResponse{Performers: performers}, nil
 }

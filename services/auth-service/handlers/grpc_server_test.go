@@ -8,10 +8,10 @@ import (
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -98,6 +98,50 @@ func (m *mockEmployeeClient) UpdatePassword(ctx context.Context, in *pb_emp.Upda
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*pb_emp.UpdatePasswordResponse), args.Error(1)
+}
+
+func (m *mockEmployeeClient) GetActuaries(ctx context.Context, in *pb_emp.GetActuariesRequest, opts ...grpc.CallOption) (*pb_emp.GetActuariesResponse, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pb_emp.GetActuariesResponse), args.Error(1)
+}
+
+func (m *mockEmployeeClient) SetAgentLimit(ctx context.Context, in *pb_emp.SetAgentLimitRequest, opts ...grpc.CallOption) (*pb_emp.SetAgentLimitResponse, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pb_emp.SetAgentLimitResponse), args.Error(1)
+}
+
+func (m *mockEmployeeClient) ResetAgentUsedLimit(ctx context.Context, in *pb_emp.ResetAgentUsedLimitRequest, opts ...grpc.CallOption) (*pb_emp.ResetAgentUsedLimitResponse, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pb_emp.ResetAgentUsedLimitResponse), args.Error(1)
+}
+
+func (m *mockEmployeeClient) SetNeedApproval(ctx context.Context, in *pb_emp.SetNeedApprovalRequest, opts ...grpc.CallOption) (*pb_emp.SetNeedApprovalResponse, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pb_emp.SetNeedApprovalResponse), args.Error(1)
+}
+
+func (m *mockEmployeeClient) ResetAllActuaryUsedLimits(ctx context.Context, in *pb_emp.ResetAllActuaryUsedLimitsRequest, opts ...grpc.CallOption) (*pb_emp.ResetAllActuaryUsedLimitsResponse, error) {
+	args := m.Called(ctx, in)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pb_emp.ResetAllActuaryUsedLimitsResponse), args.Error(1)
+}
+
+func (m *mockEmployeeClient) GetActuaryPerformers(ctx context.Context, in *pb_emp.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb_emp.GetActuaryPerformersResponse, error) {
+	return nil, nil
 }
 
 type mockEmailClient struct {
@@ -210,15 +254,15 @@ func TestValidatePassword(t *testing.T) {
 		wantNil  bool
 		wantCode codes.Code
 	}{
-		{"valid",                    "Abcdef12",                           true,  codes.OK},
-		{"valid 32 chars",           "Abcdefgh12345678Abcdefgh12345678",   true,  codes.OK},
-		{"valid exactly 8",          "Abcde12!",                           true,  codes.OK},
-		{"too short",                "Ab1",                                false, codes.InvalidArgument},
-		{"too long 33 chars",        "Abcdefgh123456789012345678901234x",  false, codes.InvalidArgument},
-		{"only one digit",           "Abcdefg1",                           false, codes.InvalidArgument},
-		{"no digits",                "Abcdefgh",                           false, codes.InvalidArgument},
-		{"no uppercase",             "abcdef12",                           false, codes.InvalidArgument},
-		{"no lowercase",             "ABCDEF12",                           false, codes.InvalidArgument},
+		{"valid", "Abcdef12", true, codes.OK},
+		{"valid 32 chars", "Abcdefgh12345678Abcdefgh12345678", true, codes.OK},
+		{"valid exactly 8", "Abcde12!", true, codes.OK},
+		{"too short", "Ab1", false, codes.InvalidArgument},
+		{"too long 33 chars", "Abcdefgh123456789012345678901234x", false, codes.InvalidArgument},
+		{"only one digit", "Abcdefg1", false, codes.InvalidArgument},
+		{"no digits", "Abcdefgh", false, codes.InvalidArgument},
+		{"no uppercase", "abcdef12", false, codes.InvalidArgument},
+		{"no lowercase", "ABCDEF12", false, codes.InvalidArgument},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -339,7 +383,7 @@ func TestRefresh_InvalidSignature(t *testing.T) {
 func TestActivateAccount_TokenNotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"employee_id", "expires_at"}))
@@ -355,7 +399,7 @@ func TestActivateAccount_TokenNotFound(t *testing.T) {
 func TestActivateAccount_ExpiredToken(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(-time.Hour))
@@ -373,7 +417,7 @@ func TestActivateAccount_ExpiredToken(t *testing.T) {
 func TestActivateAccount_AlreadyActivated(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -395,7 +439,7 @@ func TestActivateAccount_AlreadyActivated(t *testing.T) {
 func TestActivateAccount_PasswordMismatch(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -417,7 +461,7 @@ func TestActivateAccount_PasswordMismatch(t *testing.T) {
 func TestActivateAccount_InvalidPassword(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -439,7 +483,7 @@ func TestActivateAccount_InvalidPassword(t *testing.T) {
 func TestActivateAccount_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -476,7 +520,7 @@ func TestActivateAccount_HappyPath(t *testing.T) {
 func TestResetPassword_TokenNotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("password_reset_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"employee_id", "expires_at"}))
@@ -492,7 +536,7 @@ func TestResetPassword_TokenNotFound(t *testing.T) {
 func TestResetPassword_ExpiredToken(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(-time.Hour))
@@ -510,7 +554,7 @@ func TestResetPassword_ExpiredToken(t *testing.T) {
 func TestResetPassword_PasswordMismatch(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -527,7 +571,7 @@ func TestResetPassword_PasswordMismatch(t *testing.T) {
 func TestResetPassword_InvalidPassword(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -544,7 +588,7 @@ func TestResetPassword_InvalidPassword(t *testing.T) {
 func TestResetPassword_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(5), time.Now().Add(time.Hour))
@@ -751,7 +795,7 @@ func TestClientRefresh_ExpiredToken(t *testing.T) {
 func TestCreateActivationToken_DBFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("activation_tokens").
 		WillReturnError(status.Error(codes.Internal, "db error"))
@@ -765,7 +809,7 @@ func TestCreateActivationToken_DBFails(t *testing.T) {
 func TestCreateActivationToken_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("activation_tokens").
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -782,7 +826,7 @@ func TestCreateActivationToken_HappyPath(t *testing.T) {
 func TestRequestPasswordReset_EmployeeNotFound(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	empClient := &mockEmployeeClient{}
 	empClient.On("GetEmployeeByEmail", mock.Anything, mock.Anything).
@@ -797,7 +841,7 @@ func TestRequestPasswordReset_EmployeeNotFound(t *testing.T) {
 func TestRequestPasswordReset_DBFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("password_reset_tokens").
 		WillReturnError(status.Error(codes.Internal, "db error"))
@@ -816,7 +860,7 @@ func TestRequestPasswordReset_DBFails(t *testing.T) {
 func TestRequestPasswordReset_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("password_reset_tokens").
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -839,7 +883,7 @@ func TestRequestPasswordReset_HappyPath(t *testing.T) {
 func TestCreateClientActivationToken_DBFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("client_activation_tokens").
 		WillReturnError(status.Error(codes.Internal, "db error"))
@@ -853,7 +897,7 @@ func TestCreateClientActivationToken_DBFails(t *testing.T) {
 func TestCreateClientActivationToken_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectExec("client_activation_tokens").
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -869,7 +913,7 @@ func TestCreateClientActivationToken_HappyPath(t *testing.T) {
 func TestActivateClientAuth_TokenNotFound(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}))
@@ -885,7 +929,7 @@ func TestActivateClientAuth_TokenNotFound(t *testing.T) {
 func TestActivateClientAuth_ExpiredToken(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -903,7 +947,7 @@ func TestActivateClientAuth_ExpiredToken(t *testing.T) {
 func TestActivateClientAuth_AlreadyActivated(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -925,7 +969,7 @@ func TestActivateClientAuth_AlreadyActivated(t *testing.T) {
 func TestActivateClientAuth_PasswordMismatch(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -1018,7 +1062,7 @@ func TestRefresh_UsernameWrongType(t *testing.T) {
 func TestActivateAccount_DBError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("activation_tokens").WillReturnError(sql.ErrConnDone)
 
@@ -1034,7 +1078,7 @@ func TestActivateAccount_DBError(t *testing.T) {
 func TestActivateAccount_GetEmployeeByIdError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -1055,7 +1099,7 @@ func TestActivateAccount_GetEmployeeByIdError(t *testing.T) {
 func TestActivateAccount_ActivateEmployeeError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -1079,7 +1123,7 @@ func TestActivateAccount_ActivateEmployeeError(t *testing.T) {
 func TestResetPassword_DBError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("password_reset_tokens").WillReturnError(sql.ErrConnDone)
 
@@ -1095,7 +1139,7 @@ func TestResetPassword_DBError(t *testing.T) {
 func TestResetPassword_UpdatePasswordError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -1183,7 +1227,7 @@ func TestClientRefresh_UserIdWrongType(t *testing.T) {
 func TestActivateClient_DBError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").WillReturnError(sql.ErrConnDone)
 
@@ -1199,7 +1243,7 @@ func TestActivateClient_DBError(t *testing.T) {
 func TestActivateClient_GetClientByIdError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -1220,7 +1264,7 @@ func TestActivateClient_GetClientByIdError(t *testing.T) {
 func TestActivateClient_InvalidPassword(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -1243,7 +1287,7 @@ func TestActivateClient_InvalidPassword(t *testing.T) {
 func TestActivateClient_ActivateClientError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -1280,7 +1324,7 @@ func TestClientLogin_EmptyPasswordHash(t *testing.T) {
 func TestActivateAccount_ExpiredToken_DeleteFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(-time.Hour))
@@ -1299,7 +1343,7 @@ func TestActivateAccount_ExpiredToken_DeleteFails(t *testing.T) {
 func TestActivateAccount_DeleteUsedTokenFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -1333,7 +1377,7 @@ func TestActivateAccount_DeleteUsedTokenFails(t *testing.T) {
 func TestResetPassword_DeleteUsedTokenFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows([]string{"employee_id", "expires_at"}).
 		AddRow(int64(1), time.Now().Add(time.Hour))
@@ -1357,7 +1401,7 @@ func TestResetPassword_DeleteUsedTokenFails(t *testing.T) {
 func TestActivateClient_DeleteUsedTokenFails(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -1391,7 +1435,7 @@ func TestActivateClient_DeleteUsedTokenFails(t *testing.T) {
 func TestActivateClientAuth_HappyPath(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	dbMock.ExpectQuery("client_activation_tokens").
 		WillReturnRows(sqlmock.NewRows([]string{"client_id", "expires_at"}).
@@ -1800,7 +1844,6 @@ func TestGetClientApprovals_QueryError(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }
-
 
 // ---- approvalPushMessage ----
 

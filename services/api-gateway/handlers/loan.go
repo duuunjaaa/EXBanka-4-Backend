@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/loan"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -90,13 +90,13 @@ func GetLoanDetails(client pb.LoanServiceClient) gin.HandlerFunc {
 		}
 
 		type installmentJSON struct {
-			ID               int64   `json:"id"`
+			ID                int64   `json:"id"`
 			InstallmentAmount float64 `json:"installmentAmount"`
-			InterestRate     float64 `json:"interestRate"`
-			Currency         string  `json:"currency"`
-			ExpectedDueDate  string  `json:"expectedDueDate"`
-			ActualDueDate    string  `json:"actualDueDate,omitempty"`
-			Status           string  `json:"status"`
+			InterestRate      float64 `json:"interestRate"`
+			Currency          string  `json:"currency"`
+			ExpectedDueDate   string  `json:"expectedDueDate"`
+			ActualDueDate     string  `json:"actualDueDate,omitempty"`
+			Status            string  `json:"status"`
 		}
 		l := resp.Loan
 		installments := make([]installmentJSON, 0, len(resp.Installments))
@@ -115,8 +115,8 @@ func GetLoanDetails(client pb.LoanServiceClient) gin.HandlerFunc {
 			"nominalRate": l.NominalRate, "effectiveRate": l.EffectiveRate,
 			"agreedDate": l.AgreedDate, "maturityDate": l.MaturityDate,
 			"nextInstallmentAmount": l.NextInstallmentAmount,
-			"nextInstallmentDate": l.NextInstallmentDate,
-			"remainingDebt": l.RemainingDebt, "status": l.Status,
+			"nextInstallmentDate":   l.NextInstallmentDate,
+			"remainingDebt":         l.RemainingDebt, "status": l.Status,
 			"installments": installments,
 		})
 	}
@@ -150,13 +150,13 @@ func GetLoanInstallments(client pb.LoanServiceClient) gin.HandlerFunc {
 		}
 
 		type installmentJSON struct {
-			ID               int64   `json:"id"`
+			ID                int64   `json:"id"`
 			InstallmentAmount float64 `json:"installmentAmount"`
-			InterestRate     float64 `json:"interestRate"`
-			Currency         string  `json:"currency"`
-			ExpectedDueDate  string  `json:"expectedDueDate"`
-			ActualDueDate    string  `json:"actualDueDate,omitempty"`
-			Status           string  `json:"status"`
+			InterestRate      float64 `json:"interestRate"`
+			Currency          string  `json:"currency"`
+			ExpectedDueDate   string  `json:"expectedDueDate"`
+			ActualDueDate     string  `json:"actualDueDate,omitempty"`
+			Status            string  `json:"status"`
 		}
 		result := make([]installmentJSON, 0, len(resp.Installments))
 		for _, i := range resp.Installments {
@@ -381,7 +381,7 @@ func loanDetailsToJSON(loans []*pb.LoanDetail) []map[string]interface{} {
 			"agreedDate": l.AgreedDate, "maturityDate": l.MaturityDate,
 			"nextInstallmentAmount": l.NextInstallmentAmount,
 			"nextInstallmentDate":   l.NextInstallmentDate,
-			"remainingDebt": l.RemainingDebt, "status": l.Status,
+			"remainingDebt":         l.RemainingDebt, "status": l.Status,
 			"purpose":          l.Purpose,
 			"monthlySalary":    l.MonthlySalary,
 			"employmentStatus": l.EmploymentStatus,

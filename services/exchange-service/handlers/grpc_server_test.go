@@ -25,7 +25,7 @@ func newExchangeServer(t *testing.T) (*ExchangeServer, sqlmock.Sqlmock, sqlmock.
 	require.NoError(t, err)
 	accountDB, accountMock, err := sqlmock.New()
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close(); accountDB.Close() })
+	t.Cleanup(func() { _ = db.Close(); _ = accountDB.Close() })
 	return &ExchangeServer{DB: db, AccountDB: accountDB}, dbMock, accountMock
 }
 
@@ -1158,7 +1158,7 @@ func serveRates(t *testing.T, body string) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 	}))
 	orig := rateAPIURL
 	rateAPIURL = srv.URL

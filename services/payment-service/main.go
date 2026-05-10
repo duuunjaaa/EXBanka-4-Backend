@@ -17,25 +17,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to payment_db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	accountDB, err := pmdb.Connect(os.Getenv("ACCOUNT_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to account_db: %v", err)
 	}
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, err := pmdb.Connect(os.Getenv("EXCHANGE_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to exchange_db: %v", err)
 	}
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	clientDB, err := pmdb.Connect(os.Getenv("CLIENT_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to client_db: %v", err)
 	}
-	defer clientDB.Close()
+	defer func() { _ = clientDB.Close() }()
 
 	lis, err := net.Listen("tcp", ":50055")
 	if err != nil {

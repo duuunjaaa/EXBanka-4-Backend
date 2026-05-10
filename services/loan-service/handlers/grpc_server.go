@@ -36,7 +36,7 @@ func (s *LoanServer) GetClientLoans(ctx context.Context, req *pb.GetClientLoansR
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query loans: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var loans []*pb.LoanSummary
 	for rows.Next() {
@@ -112,7 +112,7 @@ func (s *LoanServer) queryInstallments(ctx context.Context, loanID int64) ([]*pb
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query installments: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var installments []*pb.Installment
 	for rows.Next() {
@@ -322,7 +322,7 @@ func (s *LoanServer) ApproveLoan(ctx context.Context, req *pb.ApproveLoanRequest
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	for i := 1; i <= repaymentPeriod; i++ {
 		dueDate := agreedDate.AddDate(0, i, 0)
@@ -390,7 +390,7 @@ func (s *LoanServer) GetAllLoanApplications(ctx context.Context, req *pb.GetAllL
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query applications: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	loans, err := scanLoanDetails(rows)
 	if err != nil {
@@ -427,7 +427,7 @@ func (s *LoanServer) GetAllLoans(ctx context.Context, req *pb.GetAllLoansRequest
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query loans: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	loans, err := scanLoanDetails(rows)
 	if err != nil {

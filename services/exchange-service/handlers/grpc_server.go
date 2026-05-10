@@ -56,8 +56,8 @@ func (s *ExchangeServer) ensureTodayRates(ctx context.Context) error {
 }
 
 type erAPIResponse struct {
-	Result  string             `json:"result"`
-	Rates   map[string]float64 `json:"rates"`
+	Result string             `json:"result"`
+	Rates  map[string]float64 `json:"rates"`
 }
 
 func fetchRatesFromAPI() (map[string]float64, error) {
@@ -66,7 +66,7 @@ func fetchRatesFromAPI() (map[string]float64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -133,7 +133,11 @@ func (s *ExchangeServer) GetExchangeRates(ctx context.Context, _ *pb.GetExchange
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query exchange rates: %v", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("exchange: rows close: %v", err)
+		}
+	}()
 
 	var rates []*pb.ExchangeRate
 	for rows.Next() {
@@ -289,7 +293,7 @@ func (s *ExchangeServer) ConvertAmount(ctx context.Context, req *pb.ConvertAmoun
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err = tx.ExecContext(ctx, `
 		UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1
@@ -426,7 +430,11 @@ func (s *ExchangeServer) GetExchangeHistory(ctx context.Context, req *pb.GetExch
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query exchange history: %v", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("exchange: rows close: %v", err)
+		}
+	}()
 
 	var txs []*pb.ExchangeTransaction
 	for rows.Next() {

@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	authpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
 	clientpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/client"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -25,11 +25,11 @@ import (
 
 type stubClientSvcClient struct {
 	getAllFn      func(context.Context, *clientpb.GetAllClientsRequest, ...grpc.CallOption) (*clientpb.GetAllClientsResponse, error)
-	getByIdFn    func(context.Context, *clientpb.GetClientByIdRequest, ...grpc.CallOption) (*clientpb.GetClientByIdResponse, error)
-	createFn     func(context.Context, *clientpb.CreateClientRequest, ...grpc.CallOption) (*clientpb.CreateClientResponse, error)
-	updateFn     func(context.Context, *clientpb.UpdateClientRequest, ...grpc.CallOption) (*clientpb.UpdateClientResponse, error)
+	getByIdFn     func(context.Context, *clientpb.GetClientByIdRequest, ...grpc.CallOption) (*clientpb.GetClientByIdResponse, error)
+	createFn      func(context.Context, *clientpb.CreateClientRequest, ...grpc.CallOption) (*clientpb.CreateClientResponse, error)
+	updateFn      func(context.Context, *clientpb.UpdateClientRequest, ...grpc.CallOption) (*clientpb.UpdateClientResponse, error)
 	credentialsFn func(context.Context, *clientpb.GetClientCredentialsRequest, ...grpc.CallOption) (*clientpb.GetClientCredentialsResponse, error)
-	activateFn   func(context.Context, *clientpb.ActivateClientRequest, ...grpc.CallOption) (*clientpb.ActivateClientResponse, error)
+	activateFn    func(context.Context, *clientpb.ActivateClientRequest, ...grpc.CallOption) (*clientpb.ActivateClientResponse, error)
 }
 
 func (s *stubClientSvcClient) GetAllClients(ctx context.Context, in *clientpb.GetAllClientsRequest, opts ...grpc.CallOption) (*clientpb.GetAllClientsResponse, error) {

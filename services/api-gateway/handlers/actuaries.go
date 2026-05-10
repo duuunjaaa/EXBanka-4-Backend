@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -213,5 +214,58 @@ func SetNeedApproval(client pb.EmployeeServiceClient) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "need_approval updated"})
+	}
+}
+
+// GetActuaryPerformances godoc
+// @Summary      Bank profit portal — actuary P&L
+// @Description  Returns realized profit in RSD for every actuary (AGENT, SUPERVISOR, ADMIN). SUPERVISOR only.
+// @Tags         bank-profit
+// @Produce      json
+// @Success      200  {array}   object
+// @Failure      500  {object}  map[string]string
+// @Security     BearerAuth
+// @Router       /bank/profit/actuaries [get]
+func GetActuaryPerformances(empClient pb.EmployeeServiceClient, ordClient pb_order.OrderServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		// 1. All employees eligible for actuary performance view (AGENT + SUPERVISOR + ADMIN)
+		perfResp, err := empClient.GetActuaryPerformers(ctx, &pb.GetActuaryPerformersRequest{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 2. Collect user IDs
+		userIDs := make([]int64, 0, len(perfResp.Performers))
+		for _, p := range perfResp.Performers {
+			userIDs = append(userIDs, p.UserId)
+		}
+
+		// 3. Realized profit per user from order-service
+		profitResp, err := ordClient.GetActuaryProfits(ctx, &pb_order.GetActuaryProfitsRequest{UserIds: userIDs})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		profitMap := make(map[int64]float64, len(profitResp.Profits))
+		for _, ap := range profitResp.Profits {
+			profitMap[ap.UserId] = ap.ProfitRsd
+		}
+
+		// 4. Join and return; default profit = 0 for employees with no completed orders
+		result := make([]gin.H, 0, len(perfResp.Performers))
+		for _, p := range perfResp.Performers {
+			result = append(result, gin.H{
+				"userId":    p.UserId,
+				"firstName": p.FirstName,
+				"lastName":  p.LastName,
+				"position":  p.Position,
+				"profit":    profitMap[p.UserId],
+			})
+		}
+		c.JSON(http.StatusOK, result)
 	}
 }

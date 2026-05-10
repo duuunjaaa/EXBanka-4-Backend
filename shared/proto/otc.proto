@@ -1,0 +1,149 @@
+syntax = "proto3";
+package otc;
+option go_package = "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/otc";
+
+service OtcService {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc CreateNegotiation(CreateNegotiationRequest) returns (NegotiationResponse);
+  rpc ListNegotiations(ListNegotiationsRequest) returns (ListNegotiationsResponse);
+  rpc GetNegotiation(GetNegotiationRequest) returns (NegotiationResponse);
+  rpc CounterOffer(CounterOfferRequest) returns (NegotiationResponse);
+  rpc AcceptNegotiation(AcceptNegotiationRequest) returns (NegotiationResponse);
+  rpc RejectNegotiation(RejectNegotiationRequest) returns (NegotiationResponse);
+  rpc ListContracts(ListContractsRequest) returns (ListContractsResponse);
+  rpc ExerciseContract(ExerciseContractRequest) returns (ExerciseContractResponse);
+  rpc GetMarket(GetMarketRequest) returns (GetMarketResponse);
+}
+
+message PingRequest {}
+message PingResponse { string message = 1; }
+
+message CreateNegotiationRequest {
+  int64  buyer_id        = 1;
+  string buyer_type      = 2; // CLIENT or EMPLOYEE
+  int64  seller_id       = 3;
+  string seller_type     = 4; // CLIENT or EMPLOYEE
+  string ticker          = 5;
+  int32  amount          = 6;
+  double price_per_stock = 7;
+  string settlement_date = 8; // YYYY-MM-DD
+  double premium         = 9;
+  string currency        = 10;
+}
+
+message CounterOfferRequest {
+  int64  negotiation_id  = 1;
+  int64  caller_id       = 2;
+  string caller_type     = 3; // CLIENT or EMPLOYEE
+  int32  amount          = 4;
+  double price_per_stock = 5;
+  string settlement_date = 6;
+  double premium         = 7;
+}
+
+message AcceptNegotiationRequest {
+  int64  negotiation_id   = 1;
+  int64  caller_id        = 2;
+  string caller_type      = 3;
+  int64  buyer_account_id = 4;
+}
+
+message RejectNegotiationRequest {
+  int64  negotiation_id = 1;
+  int64  caller_id      = 2;
+  string caller_type    = 3;
+}
+
+message ListNegotiationsRequest {
+  int64  caller_id   = 1;
+  string caller_type = 2; // CLIENT or EMPLOYEE
+}
+
+message GetNegotiationRequest {
+  int64 negotiation_id = 1;
+}
+
+message NegotiationResponse {
+  int64  id              = 1;
+  string ticker          = 2;
+  int64  seller_id       = 3;
+  string seller_type     = 4;
+  string seller_name     = 5;
+  int64  buyer_id        = 6;
+  string buyer_type      = 7;
+  string buyer_name      = 8;
+  int32  amount          = 9;
+  double price_per_stock = 10;
+  string settlement_date = 11;
+  double premium         = 12;
+  string currency        = 13;
+  string last_modified   = 14; // RFC3339
+  int64  modified_by_id  = 15;
+  string modified_by_type = 16;
+  string modified_by_name = 17;
+  string status          = 18;
+}
+
+message ListNegotiationsResponse {
+  repeated NegotiationResponse negotiations = 1;
+}
+
+message ContractResponse {
+  int64  id              = 1;
+  int64  negotiation_id  = 2;
+  int64  seller_id       = 3;
+  string seller_type     = 4;
+  string seller_name     = 5;
+  int64  buyer_id        = 6;
+  string buyer_type      = 7;
+  string buyer_name      = 8;
+  string ticker          = 9;
+  int32  amount          = 10;
+  double strike_price    = 11;
+  double premium         = 12;
+  string currency        = 13;
+  string settlement_date = 14;
+  string status          = 15;
+  string created_at      = 16;
+  double profit          = 17;
+}
+
+message ListContractsRequest {
+  int64  caller_id     = 1;
+  string caller_type   = 2;
+  string status_filter = 3;
+}
+message ListContractsResponse {
+  repeated ContractResponse contracts = 1;
+}
+
+message ExerciseContractRequest {
+  int64  contract_id      = 1;
+  int64  caller_id        = 2;
+  string caller_type      = 3;
+  int64  buyer_account_id = 4;
+}
+message ExerciseContractResponse {
+  string status      = 1;
+  string executed_at = 2;
+}
+
+message GetMarketRequest {
+  int64  caller_id   = 1;
+  string caller_type = 2;
+}
+message MarketItem {
+  string ticker          = 1;
+  string name            = 2;
+  int32  amount          = 3;
+  double price_per_stock = 4;
+  string currency        = 5;
+  string last_updated    = 6;
+  string owner_name      = 7;
+  string owner_bank      = 8;
+  int64  owner_id        = 9;
+  string owner_type      = 10;
+}
+message GetMarketResponse {
+  repeated MarketItem items = 1;
+}

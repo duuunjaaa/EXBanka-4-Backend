@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/lib/pq"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/client"
+	"github.com/lib/pq"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -71,7 +71,7 @@ func (s *ClientServer) GetAllClients(ctx context.Context, req *pb.GetAllClientsR
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var clients []*pb.Client
 	for rows.Next() {

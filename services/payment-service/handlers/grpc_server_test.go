@@ -25,7 +25,7 @@ func newPaymentServer(t *testing.T) (*PaymentServer, sqlmock.Sqlmock, sqlmock.Sq
 	accountDB, accountMock, err := sqlmock.New()
 	require.NoError(t, err)
 	s := &PaymentServer{DB: db, AccountDB: accountDB}
-	t.Cleanup(func() { db.Close(); accountDB.Close() })
+	t.Cleanup(func() { _ = db.Close(); _ = accountDB.Close() })
 	return s, dbMock, accountMock
 }
 
@@ -40,7 +40,7 @@ func newTransferServer(t *testing.T) (*PaymentServer, sqlmock.Sqlmock, sqlmock.S
 	exchangeDB, exchangeMock, err := sqlmock.New()
 	require.NoError(t, err)
 	s := &PaymentServer{DB: db, AccountDB: accountDB, ExchangeDB: exchangeDB}
-	t.Cleanup(func() { db.Close(); accountDB.Close(); exchangeDB.Close() })
+	t.Cleanup(func() { _ = db.Close(); _ = accountDB.Close(); _ = exchangeDB.Close() })
 	return s, dbMock, accountMock, exchangeMock
 }
 
@@ -55,7 +55,7 @@ func newPaymentServerWithExchange(t *testing.T) (*PaymentServer, sqlmock.Sqlmock
 	exchangeDB, exchangeMock, err := sqlmock.New()
 	require.NoError(t, err)
 	s := &PaymentServer{DB: db, AccountDB: accountDB, ExchangeDB: exchangeDB}
-	t.Cleanup(func() { db.Close(); accountDB.Close(); exchangeDB.Close() })
+	t.Cleanup(func() { _ = db.Close(); _ = accountDB.Close(); _ = exchangeDB.Close() })
 	return s, dbMock, accountMock, exchangeMock
 }
 
@@ -67,8 +67,8 @@ func newMockServer(t *testing.T) (*PaymentServer, sqlmock.Sqlmock, sqlmock.Sqlmo
 	accountDB, accountMock, err := sqlmock.New()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		paymentDB.Close()
-		accountDB.Close()
+		_ = paymentDB.Close()
+		_ = accountDB.Close()
 	})
 	return &PaymentServer{DB: paymentDB, AccountDB: accountDB}, paymentMock, accountMock
 }
@@ -84,7 +84,7 @@ func newMockServerFull(t *testing.T) (*PaymentServer, sqlmock.Sqlmock, sqlmock.S
 	require.NoError(t, err)
 	clientDB, clientMock, err := sqlmock.New()
 	require.NoError(t, err)
-	t.Cleanup(func() { paymentDB.Close(); accountDB.Close(); exchangeDB.Close(); clientDB.Close() })
+	t.Cleanup(func() { _ = paymentDB.Close(); _ = accountDB.Close(); _ = exchangeDB.Close(); _ = clientDB.Close() })
 	return &PaymentServer{DB: paymentDB, AccountDB: accountDB, ExchangeDB: exchangeDB, ClientDB: clientDB},
 		paymentMock, accountMock, exchangeMock, clientMock
 }
@@ -99,7 +99,7 @@ func newMockServerWithClientDB(t *testing.T) (*PaymentServer, sqlmock.Sqlmock, s
 	require.NoError(t, err)
 	clientDB, clientMock, err := sqlmock.New()
 	require.NoError(t, err)
-	t.Cleanup(func() { paymentDB.Close(); accountDB.Close(); clientDB.Close() })
+	t.Cleanup(func() { _ = paymentDB.Close(); _ = accountDB.Close(); _ = clientDB.Close() })
 	return &PaymentServer{DB: paymentDB, AccountDB: accountDB, ClientDB: clientDB}, paymentMock, accountMock, clientMock
 }
 
@@ -119,8 +119,8 @@ func TestCreatePayment_SourceNotFound(t *testing.T) {
 func TestCreatePayment_WrongOwner(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(99), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(99), int64(1)),
 	)
 
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
@@ -133,9 +133,19 @@ func TestCreatePayment_WrongOwner(t *testing.T) {
 func TestCreatePayment_InsufficientFunds(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(50), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
+	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
+	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(50), nil, nil, float64(0), float64(0)),
+	)
+	accountMock.ExpectRollback()
 
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
 		FromAccount: "ACC1", ClientId: 1, Amount: 100,
@@ -147,9 +157,19 @@ func TestCreatePayment_InsufficientFunds(t *testing.T) {
 func TestCreatePayment_DailyLimitExceeded(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(5000), sql.NullFloat64{Float64: 500, Valid: true}, nil, float64(450), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
+	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
+	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(5000), sql.NullFloat64{Float64: 500, Valid: true}, nil, float64(450), float64(0)),
+	)
+	accountMock.ExpectRollback()
 
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
 		FromAccount: "ACC1", ClientId: 1, Amount: 100,
@@ -161,9 +181,19 @@ func TestCreatePayment_DailyLimitExceeded(t *testing.T) {
 func TestCreatePayment_MonthlyLimitExceeded(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(5000), nil, sql.NullFloat64{Float64: 2000, Valid: true}, float64(0), float64(1950), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
+	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
+	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(5000), nil, sql.NullFloat64{Float64: 2000, Valid: true}, float64(0), float64(1950)),
+	)
+	accountMock.ExpectRollback()
 
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
 		FromAccount: "ACC1", ClientId: 1, Amount: 100,
@@ -176,13 +206,17 @@ func TestCreatePayment_HappyPath_SameCurrency(t *testing.T) {
 	s, dbMock, accountMock := newPaymentServer(t)
 
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(1)),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectCommit()
@@ -204,8 +238,8 @@ func TestCreatePayment_HappyPath_ExternalAccount(t *testing.T) {
 	s, dbMock, accountMock := newPaymentServer(t)
 
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
 	// external recipient: bank source-currency intermediary account lookup
@@ -213,6 +247,10 @@ func TestCreatePayment_HappyPath_ExternalAccount(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectCommit()
@@ -241,8 +279,8 @@ func TestCreatePayment_SourceInternalError(t *testing.T) {
 func TestCreatePayment_HappyPath_DifferentCurrency(t *testing.T) {
 	s, dbMock, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -266,6 +304,10 @@ func TestCreatePayment_HappyPath_DifferentCurrency(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-EUR-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit client
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank from
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank to
@@ -285,10 +327,13 @@ func TestCreatePayment_HappyPath_DifferentCurrency(t *testing.T) {
 func TestCreatePayment_BeginTxError(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
 	accountMock.ExpectBegin().WillReturnError(sql.ErrConnDone)
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
 		FromAccount: "ACC1", ClientId: 1, Amount: 100,
@@ -300,11 +345,18 @@ func TestCreatePayment_BeginTxError(t *testing.T) {
 func TestCreatePayment_DebitError(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnError(sql.ErrConnDone)
 	accountMock.ExpectRollback()
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
@@ -317,13 +369,17 @@ func TestCreatePayment_DebitError(t *testing.T) {
 func TestCreatePayment_CreditError(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(1)),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnError(sql.ErrConnDone)
 	accountMock.ExpectRollback()
@@ -337,12 +393,20 @@ func TestCreatePayment_CreditError(t *testing.T) {
 func TestCreatePayment_CommitError(t *testing.T) {
 	s, _, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
 	accountMock.ExpectBegin()
-	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
+	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit client
+	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank
 	accountMock.ExpectCommit().WillReturnError(sql.ErrConnDone)
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
 		FromAccount: "ACC1", RecipientAccount: "EXTERNAL", ClientId: 1, Amount: 100,
@@ -354,12 +418,20 @@ func TestCreatePayment_CommitError(t *testing.T) {
 func TestCreatePayment_PersistError(t *testing.T) {
 	s, dbMock, accountMock := newPaymentServer(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnError(sql.ErrNoRows)
+	accountMock.ExpectQuery("SELECT account_number FROM accounts").WillReturnRows(
+		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
+	)
 	accountMock.ExpectBegin()
-	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
+	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit client
+	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank
 	accountMock.ExpectCommit()
 	dbMock.ExpectQuery("INSERT INTO payments").WillReturnError(sql.ErrConnDone)
 	_, err := s.CreatePayment(context.Background(), &pb.CreatePaymentRequest{
@@ -975,7 +1047,7 @@ func TestCreateTransfer_SameAccount(t *testing.T) {
 
 func TestCreateTransfer_SourceNotFound(t *testing.T) {
 	s, _, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
+	accountMock.ExpectQuery("SELECT id, owner_id").
 		WillReturnError(sql.ErrNoRows)
 	_, err := s.CreateTransfer(context.Background(), &pb.CreateTransferRequest{
 		ClientId: 1, FromAccount: "ACC1", ToAccount: "ACC2", Amount: 100,
@@ -986,9 +1058,9 @@ func TestCreateTransfer_SourceNotFound(t *testing.T) {
 
 func TestCreateTransfer_SourceNotOwned(t *testing.T) {
 	s, _, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(99), float64(500), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(99), int64(1)))
 	_, err := s.CreateTransfer(context.Background(), &pb.CreateTransferRequest{
 		ClientId: 1, FromAccount: "ACC1", ToAccount: "ACC2", Amount: 100,
 	})
@@ -998,9 +1070,9 @@ func TestCreateTransfer_SourceNotOwned(t *testing.T) {
 
 func TestCreateTransfer_DestNotFound(t *testing.T) {
 	s, _, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnError(sql.ErrNoRows)
 	_, err := s.CreateTransfer(context.Background(), &pb.CreateTransferRequest{
@@ -1012,9 +1084,9 @@ func TestCreateTransfer_DestNotFound(t *testing.T) {
 
 func TestCreateTransfer_DestNotOwned(t *testing.T) {
 	s, _, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(99), int64(1)))
@@ -1027,12 +1099,17 @@ func TestCreateTransfer_DestNotOwned(t *testing.T) {
 
 func TestCreateTransfer_InsufficientFunds(t *testing.T) {
 	s, _, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(50), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(1), int64(1)))
+	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(50)),
+	)
+	accountMock.ExpectRollback()
 	_, err := s.CreateTransfer(context.Background(), &pb.CreateTransferRequest{
 		ClientId: 1, FromAccount: "ACC1", ToAccount: "ACC2", Amount: 100,
 	})
@@ -1042,13 +1119,16 @@ func TestCreateTransfer_InsufficientFunds(t *testing.T) {
 
 func TestCreateTransfer_SameCurrency_Happy(t *testing.T) {
 	s, dbMock, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(1), int64(1)))
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectCommit()
@@ -1068,9 +1148,9 @@ func TestCreateTransfer_SameCurrency_Happy(t *testing.T) {
 
 func TestCreateTransfer_DifferentCurrency_Happy(t *testing.T) {
 	s, dbMock, accountMock, exchangeMock := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(1), int64(2)))
@@ -1092,6 +1172,9 @@ func TestCreateTransfer_DifferentCurrency_Happy(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-EUR-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(1000)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit source
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank from
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank to
@@ -1113,9 +1196,9 @@ func TestCreateTransfer_DifferentCurrency_Happy(t *testing.T) {
 
 func TestCreateTransfer_RateNotFound(t *testing.T) {
 	s, _, accountMock, exchangeMock := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(1), int64(2)))
@@ -1135,13 +1218,16 @@ func TestCreateTransfer_RateNotFound(t *testing.T) {
 
 func TestCreateTransfer_CommitError(t *testing.T) {
 	s, _, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(1), int64(1)))
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectCommit().WillReturnError(sql.ErrConnDone)
@@ -1154,13 +1240,16 @@ func TestCreateTransfer_CommitError(t *testing.T) {
 
 func TestCreateTransfer_PersistError(t *testing.T) {
 	s, dbMock, accountMock, _ := newTransferServer(t)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(1)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)))
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
 			AddRow(int64(2), int64(1), int64(1)))
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1))
 	accountMock.ExpectCommit()
@@ -1305,8 +1394,8 @@ func TestCreatePayment_DifferentCurrency_ToRSD(t *testing.T) {
 
 	// from account: EUR (currency_id=2)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	// to account: RSD (currency_id=1)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
@@ -1333,6 +1422,10 @@ func TestCreatePayment_DifferentCurrency_ToRSD(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit client
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank EUR
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank RSD
@@ -1356,8 +1449,8 @@ func TestCreatePayment_DifferentCurrency_BothForeign(t *testing.T) {
 
 	// from account: EUR (currency_id=2)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	// to account: USD (currency_id=3)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
@@ -1387,6 +1480,10 @@ func TestCreatePayment_DifferentCurrency_BothForeign(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-USD-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit client
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank EUR
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank USD
@@ -1409,9 +1506,9 @@ func TestCreateTransfer_ToCodeRSD_Happy(t *testing.T) {
 	s, dbMock, accountMock, exchangeMock := newTransferServer(t)
 
 	// from account: EUR (currency_id=2)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(2)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)))
 	// to account: RSD (currency_id=1)
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
@@ -1433,6 +1530,9 @@ func TestCreateTransfer_ToCodeRSD_Happy(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-RSD-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit source
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank EUR
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank RSD
@@ -1458,8 +1558,8 @@ func TestCreateTransfer_ToCodeRSD_Happy(t *testing.T) {
 func TestCreatePayment_FromCodeResolveError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(3)),
@@ -1475,8 +1575,8 @@ func TestCreatePayment_FromCodeResolveError(t *testing.T) {
 func TestCreatePayment_ToCodeResolveError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(3)),
@@ -1496,8 +1596,8 @@ func TestCreatePayment_ToRSD_RateError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	// from: EUR (currency_id=2), to: RSD (currency_id=1)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(3), int64(1)),
@@ -1522,8 +1622,8 @@ func TestCreatePayment_FromRSD_RateError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	// from: RSD, to: EUR
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -1548,8 +1648,8 @@ func TestCreatePayment_DefaultCase_FromBuyingRateError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	// from: EUR, to: USD
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(3)),
@@ -1573,8 +1673,8 @@ func TestCreatePayment_DefaultCase_FromBuyingRateError(t *testing.T) {
 func TestCreatePayment_DefaultCase_ToSellingRateError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(2)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(3)),
@@ -1602,8 +1702,8 @@ func TestCreatePayment_BankFromAcctError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	// from: RSD, to: EUR — cross-currency, bankFromAcct lookup fails
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -1629,8 +1729,8 @@ func TestCreatePayment_BankFromAcctError(t *testing.T) {
 func TestCreatePayment_BankToAcctError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -1659,8 +1759,8 @@ func TestCreatePayment_BankToAcctError(t *testing.T) {
 func TestCreatePayment_CrossCurrency_CreditBankSrcError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -1681,6 +1781,10 @@ func TestCreatePayment_CrossCurrency_CreditBankSrcError(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-EUR-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit source
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnError(sql.ErrConnDone)          // credit bank src fails
 	accountMock.ExpectRollback()
@@ -1694,8 +1798,8 @@ func TestCreatePayment_CrossCurrency_CreditBankSrcError(t *testing.T) {
 func TestCreatePayment_CrossCurrency_DebitBankDestError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -1716,6 +1820,10 @@ func TestCreatePayment_CrossCurrency_DebitBankDestError(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-EUR-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit source
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank src
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnError(sql.ErrConnDone)          // debit bank dest fails
@@ -1730,8 +1838,8 @@ func TestCreatePayment_CrossCurrency_DebitBankDestError(t *testing.T) {
 func TestCreatePayment_CrossCurrency_CreditDestError(t *testing.T) {
 	s, _, accountMock, exchangeMock := newPaymentServerWithExchange(t)
 	accountMock.ExpectQuery("SELECT id, owner_id").WillReturnRows(
-		sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(1000), nil, nil, float64(0), float64(0), int64(1)),
+		sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(1)),
 	)
 	accountMock.ExpectQuery("SELECT id, currency_id").WillReturnRows(
 		sqlmock.NewRows([]string{"id", "currency_id"}).AddRow(int64(2), int64(2)),
@@ -1752,6 +1860,10 @@ func TestCreatePayment_CrossCurrency_CreditDestError(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-EUR-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance", "daily_limit", "monthly_limit", "daily_spent", "monthly_spent"}).
+			AddRow(float64(1000), nil, nil, float64(0), float64(0)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit source
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank src
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank dest
@@ -2282,9 +2394,9 @@ func TestCreateTransfer_BothForeign_Happy(t *testing.T) {
 	s, dbMock, accountMock, exchangeMock := newTransferServer(t)
 
 	// from account: EUR (currency_id=2)
-	accountMock.ExpectQuery("SELECT id, owner_id, available_balance, currency_id").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "available_balance", "currency_id"}).
-			AddRow(int64(1), int64(1), float64(500), int64(2)))
+	accountMock.ExpectQuery("SELECT id, owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
+			AddRow(int64(1), int64(1), int64(2)))
 	// to account: USD (currency_id=3)
 	accountMock.ExpectQuery("SELECT id, owner_id, currency_id").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "owner_id", "currency_id"}).
@@ -2309,6 +2421,9 @@ func TestCreateTransfer_BothForeign_Happy(t *testing.T) {
 		sqlmock.NewRows([]string{"account_number"}).AddRow("BANK-USD-001"),
 	)
 	accountMock.ExpectBegin()
+	accountMock.ExpectQuery("SELECT available_balance").WillReturnRows(
+		sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)),
+	)
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit source
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // credit bank EUR
 	accountMock.ExpectExec("UPDATE accounts SET").WillReturnResult(sqlmock.NewResult(1, 1)) // debit bank USD

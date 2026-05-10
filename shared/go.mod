@@ -3,7 +3,7 @@ module github.com/RAF-SI-2025/EXBanka-4-Backend/shared
 go 1.26.1
 
 require (
-	google.golang.org/grpc v1.79.2
+	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.10
 )
 

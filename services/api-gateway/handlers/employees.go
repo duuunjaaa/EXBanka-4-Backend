@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	authpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
 	emailpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

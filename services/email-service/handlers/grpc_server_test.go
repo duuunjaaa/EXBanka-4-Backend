@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/email-service/queue"
+	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 )
 
 // ---- mock Publisher ----
@@ -208,6 +208,91 @@ func TestSendAccountCreatedEmail_HappyPath(t *testing.T) {
 	resp, err := s.SendAccountCreatedEmail(context.Background(), &pb.SendAccountCreatedEmailRequest{
 		Email: "client@example.com", FirstName: "Ana",
 		AccountName: "Tekuci", AccountNumber: "265000100000000101", CurrencyCode: "RSD",
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	pub.AssertExpectations(t)
+}
+
+// ---- SendCardConfirmationEmail tests ----
+
+func TestSendCardConfirmationEmail_InvalidEmail(t *testing.T) {
+	s := &EmailServer{Producer: &mockPublisher{}}
+	_, err := s.SendCardConfirmationEmail(context.Background(), &pb.SendCardConfirmationEmailRequest{
+		Email: "not-an-email",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestSendCardConfirmationEmail_PublisherFails(t *testing.T) {
+	pub := &mockPublisher{}
+	pub.On("PublishCardConfirmation", mock.Anything).Return(errors.New("amqp error"))
+
+	s := &EmailServer{Producer: pub}
+	_, err := s.SendCardConfirmationEmail(context.Background(), &pb.SendCardConfirmationEmailRequest{
+		Email: "user@example.com", FirstName: "Marko", ConfirmationCode: "482019",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestSendCardConfirmationEmail_HappyPath(t *testing.T) {
+	pub := &mockPublisher{}
+	pub.On("PublishCardConfirmation", queue.CardConfirmationMessage{
+		Email:            "user@example.com",
+		FirstName:        "Marko",
+		ConfirmationCode: "482019",
+	}).Return(nil)
+
+	s := &EmailServer{Producer: pub}
+	resp, err := s.SendCardConfirmationEmail(context.Background(), &pb.SendCardConfirmationEmailRequest{
+		Email: "user@example.com", FirstName: "Marko", ConfirmationCode: "482019",
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	pub.AssertExpectations(t)
+}
+
+// ---- SendLoanLatePaymentEmail tests ----
+
+func TestSendLoanLatePaymentEmail_InvalidEmail(t *testing.T) {
+	s := &EmailServer{Producer: &mockPublisher{}}
+	_, err := s.SendLoanLatePaymentEmail(context.Background(), &pb.SendLoanLatePaymentEmailRequest{
+		Email: "bad@@",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestSendLoanLatePaymentEmail_PublisherFails(t *testing.T) {
+	pub := &mockPublisher{}
+	pub.On("PublishLoanLatePayment", mock.Anything).Return(errors.New("amqp error"))
+
+	s := &EmailServer{Producer: pub}
+	_, err := s.SendLoanLatePaymentEmail(context.Background(), &pb.SendLoanLatePaymentEmailRequest{
+		Email: "user@example.com", FirstName: "Petar",
+		LoanNumber: "123", AmountDue: 5000.0, Currency: "RSD", RetryCount: 1,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestSendLoanLatePaymentEmail_HappyPath(t *testing.T) {
+	pub := &mockPublisher{}
+	pub.On("PublishLoanLatePayment", queue.LoanLatePaymentMessage{
+		Email:      "user@example.com",
+		FirstName:  "Petar",
+		LoanNumber: "123",
+		AmountDue:  5000.0,
+		Currency:   "RSD",
+		RetryCount: 1,
+	}).Return(nil)
+
+	s := &EmailServer{Producer: pub}
+	resp, err := s.SendLoanLatePaymentEmail(context.Background(), &pb.SendLoanLatePaymentEmailRequest{
+		Email: "user@example.com", FirstName: "Petar",
+		LoanNumber: "123", AmountDue: 5000.0, Currency: "RSD", RetryCount: 1,
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, resp)

@@ -129,11 +129,12 @@ message DeleteAccountRequest {
 message DeleteAccountResponse {}
 
 message BankAccountItem {
-  string account_number    = 1;
-  string account_name      = 2;
-  string currency_code     = 3;
-  double balance           = 4;
-  double available_balance = 5;
+  int64  id                = 1;
+  string account_number    = 2;
+  string account_name      = 3;
+  string currency_code     = 4;
+  double balance           = 5;
+  double available_balance = 6;
 }
 
 message GetBankAccountsRequest {}

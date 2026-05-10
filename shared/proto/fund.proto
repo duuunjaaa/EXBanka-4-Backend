@@ -1,0 +1,125 @@
+syntax = "proto3";
+package fund;
+option go_package = "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund";
+
+service FundService {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc CreateFund(CreateFundRequest) returns (FundResponse);
+  rpc ListFunds(ListFundsRequest) returns (ListFundsResponse);
+  rpc GetFund(GetFundRequest) returns (FundResponse);
+  rpc UpdateFund(UpdateFundRequest) returns (FundResponse);
+  rpc DeleteFund(DeleteFundRequest) returns (DeleteFundResponse);
+  rpc InvestFund(InvestFundRequest) returns (FundResponse);
+  rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
+  rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
+  rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
+  rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
+}
+
+message PingRequest {}
+message PingResponse { string message = 1; }
+
+message CreateFundRequest {
+  string name                  = 1;
+  string description           = 2;
+  double minimum_contribution  = 3;
+  int64  manager_id            = 4;
+  int64  created_by_id         = 5; // employee ID of creator
+}
+
+message UpdateFundRequest {
+  int64  id                   = 1;
+  string name                 = 2;
+  string description          = 3;
+  double minimum_contribution = 4;
+  int64  manager_id           = 5;
+}
+
+message DeleteFundRequest {
+  int64 id = 1;
+}
+
+message DeleteFundResponse {}
+
+message ListFundsRequest {
+  int64 manager_id_filter = 1; // 0 = no filter
+}
+
+message GetFundRequest {
+  int64 id = 1;
+}
+
+message FundResponse {
+  int64  id                   = 1;
+  string name                 = 2;
+  string description          = 3;
+  double minimum_contribution = 4;
+  int64  manager_id           = 5;
+  string manager_name         = 6;
+  double liquid_assets        = 7;
+  double fund_value           = 8;
+  double profit               = 9;
+  string account_number       = 10;
+  string created_at           = 11;
+  bool   active               = 12;
+  int64  account_id           = 13;
+}
+
+message ListFundsResponse {
+  repeated FundResponse funds = 1;
+}
+
+message InvestFundRequest {
+  int64  fund_id           = 1;
+  int64  client_id         = 2;
+  string client_type       = 3; // "CLIENT" or "BANK"
+  int64  source_account_id = 4;
+  double amount            = 5;
+}
+
+message WithdrawFundRequest {
+  int64  fund_id                = 1;
+  int64  client_id              = 2;
+  string client_type            = 3;
+  int64  destination_account_id = 4;
+  double amount                 = 5; // 0 = full position
+}
+
+// ── GetBankPositions ──────────────────────────────────────────────────────────
+
+message BankFundPosition {
+  int64  fund_id            = 1;
+  string fund_name          = 2;
+  string manager_name       = 3;
+  double bank_share_percent = 4;
+  double bank_share_rsd     = 5;
+  double profit_rsd         = 6;
+}
+message GetBankPositionsRequest {}
+message GetBankPositionsResponse {
+  repeated BankFundPosition positions = 1;
+}
+
+// ── ValidateFundAccount ───────────────────────────────────────────────────────
+
+message ValidateFundAccountRequest {
+  int64  fund_id         = 1;
+  int64  manager_id      = 2;
+  double required_amount = 3;
+}
+message ValidateFundAccountResponse {
+  int64  account_id    = 1;
+  bool   is_liquid     = 2;
+  double liquid_assets = 3;
+}
+
+// ── UpdateFundHolding ─────────────────────────────────────────────────────────
+
+message UpdateFundHoldingRequest {
+  int64  fund_id    = 1;
+  int64  listing_id = 2;
+  int64  quantity   = 3;
+  double price      = 4;
+  string direction  = 5; // BUY or SELL
+}
+message UpdateFundHoldingResponse {}

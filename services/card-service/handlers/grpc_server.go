@@ -9,9 +9,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/card-service/utils"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/card"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -113,11 +113,11 @@ func (s *CardServer) CreateCard(ctx context.Context, req *pb.CreateCardRequest) 
 
 	// 6. Insert card
 	var card struct {
-		id            int64
-		cardType      string
-		createdAt     time.Time
-		cardLimit     sql.NullFloat64
-		status        string
+		id        int64
+		cardType  string
+		createdAt time.Time
+		cardLimit sql.NullFloat64
+		status    string
 	}
 	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO cards (card_number, card_type, card_name, expiry_date, account_number, cvv, status, authorized_person_id)
@@ -157,7 +157,7 @@ func (s *CardServer) GetCardsByAccount(ctx context.Context, req *pb.GetCardsByAc
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to query cards: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cards []*pb.CardResponse
 	for rows.Next() {
@@ -361,7 +361,7 @@ func (s *CardServer) InitiateCardRequest(ctx context.Context, req *pb.InitiateCa
 	}
 
 	return &pb.InitiateCardRequestResponse{
-		RequestToken:    token,
+		RequestToken:     token,
 		ConfirmationCode: code,
 	}, nil
 }
@@ -374,14 +374,14 @@ func (s *CardServer) ConfirmCardRequest(ctx context.Context, req *pb.ConfirmCard
 	}
 
 	var (
-		accountNumber   string
-		cardName        string
-		callerClientID  int64
-		forSelf         bool
-		apDataJSON      []byte
-		storedCode      string
-		expiresAt       time.Time
-		used            bool
+		accountNumber  string
+		cardName       string
+		callerClientID int64
+		forSelf        bool
+		apDataJSON     []byte
+		storedCode     string
+		expiresAt      time.Time
+		used           bool
 	)
 	err := s.DB.QueryRowContext(ctx, `
 		SELECT account_number, card_name, caller_client_id, for_self,
@@ -421,10 +421,10 @@ func (s *CardServer) ConfirmCardRequest(ctx context.Context, req *pb.ConfirmCard
 
 	// Delegate to CreateCard
 	createResp, err := s.CreateCard(ctx, &pb.CreateCardRequest{
-		AccountNumber:   accountNumber,
-		CardName:        cardName,
-		CallerClientId:  callerClientID,
-		ForSelf:         forSelf,
+		AccountNumber:    accountNumber,
+		CardName:         cardName,
+		CallerClientId:   callerClientID,
+		ForSelf:          forSelf,
 		AuthorizedPerson: apData,
 	})
 	if err != nil {
@@ -490,7 +490,7 @@ type scanner interface {
 
 func scanCard(s scanner) (*pb.CardResponse, error) {
 	var (
-		c         pb.CardResponse
+		c          pb.CardResponse
 		expiryDate time.Time
 		createdAt  time.Time
 		cardLimit  sql.NullFloat64

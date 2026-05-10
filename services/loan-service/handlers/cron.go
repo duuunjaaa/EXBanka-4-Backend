@@ -66,14 +66,7 @@ func (s *LoanServer) collectInstallments(forceLoanID int64) int {
 		log.Printf("loan-service: daily cron query error: %v", err)
 		return 0
 	}
-	defer rows.Close()
-
-	type loanRow struct {
-		id, accountNumber string
-		amount            float64
-		currency          string
-		remainingDebt     float64
-	}
+	defer func() { _ = rows.Close() }()
 
 	var loans []struct {
 		id            int64
@@ -253,17 +246,17 @@ func (s *LoanServer) updateVariableRates() {
 		log.Printf("loan-service: monthly cron query error: %v", err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type varLoan struct {
-		id             int64
-		loanType       string
-		amount         float64
-		nominalRate    float64
-		effectiveRate  float64
-		remainingDebt  float64
+		id              int64
+		loanType        string
+		amount          float64
+		nominalRate     float64
+		effectiveRate   float64
+		remainingDebt   float64
 		repaymentPeriod int
-		agreedDate     time.Time
+		agreedDate      time.Time
 	}
 
 	var loans []varLoan

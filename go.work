@@ -4,12 +4,17 @@ use (
 	./services/account-service
 	./services/api-gateway
 	./services/auth-service
+	./services/card-service
 	./services/client-service
 	./services/email-service
 	./services/employee-service
 	./services/exchange-service
-	./services/card-service
+	./services/fund-service
 	./services/loan-service
+	./services/order-service
+	./services/otc-service
 	./services/payment-service
+	./services/portfolio-service
+	./services/securities-service
 	./shared
 )

@@ -21,32 +21,32 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to loan_db: %v", err)
 	}
-	defer loanDB.Close()
+	defer func() { _ = loanDB.Close() }()
 
 	accountDB, err := loandb.Connect(os.Getenv("ACCOUNT_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to account_db: %v", err)
 	}
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, err := loandb.Connect(os.Getenv("EXCHANGE_DB_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to exchange_db: %v", err)
 	}
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	emailConn, err := grpc.NewClient(os.Getenv("EMAIL_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("failed to connect to email-service: %v", err)
 	}
-	defer emailConn.Close()
+	defer func() { _ = emailConn.Close() }()
 	emailClient := pb_email.NewEmailServiceClient(emailConn)
 
 	clientConn, err := grpc.NewClient(os.Getenv("CLIENT_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("failed to connect to client-service: %v", err)
 	}
-	defer clientConn.Close()
+	defer func() { _ = clientConn.Close() }()
 	clientClient := pb_client.NewClientServiceClient(clientConn)
 
 	lis, err := net.Listen("tcp", grpcPort)

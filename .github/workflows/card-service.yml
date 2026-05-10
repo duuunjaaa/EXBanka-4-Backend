@@ -1,0 +1,107 @@
+name: Card Service
+
+on:
+  pull_request:
+    paths:
+      - 'services/card-service/**'
+      - 'shared/**'
+      - '.github/workflows/card-service.yml'
+
+jobs:
+  build:
+    name: Build project
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/card-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: 'services/card-service/go.mod'
+      - name: Build project
+        run: go build -o card-service ./main.go
+
+  unit-test:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/card-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: 'services/card-service/go.mod'
+      - name: Run tests
+        run: go test -v ./...
+
+  lint:
+    permissions:
+      contents: read
+      pull-requests: read
+
+    name: Lint project
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/card-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: 'services/card-service/go.mod'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20
+        with:
+          version: v2.11
+          working-directory: services/card-service
+
+  gofmt:
+    name: Go format
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/card-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: 'services/card-service/go.mod'
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+  gomodtidy:
+    name: Go mod tidy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/card-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Install Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: 'services/card-service/go.mod'
+      - name: Go mod tidy
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.*; then
+            echo "go.mod or go.sum is not tidy. Please run 'go mod tidy' and commit the changes."
+            exit 1
+          fi

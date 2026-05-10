@@ -16,10 +16,10 @@ import (
 // ---- stub exchange service client ----
 
 type stubExchangeClient struct {
-	getRatesFn      func(context.Context, *exchangepb.GetExchangeRatesRequest, ...grpc.CallOption) (*exchangepb.GetExchangeRatesResponse, error)
-	convertFn       func(context.Context, *exchangepb.ConvertAmountRequest, ...grpc.CallOption) (*exchangepb.ConvertAmountResponse, error)
-	historyFn       func(context.Context, *exchangepb.GetExchangeHistoryRequest, ...grpc.CallOption) (*exchangepb.GetExchangeHistoryResponse, error)
-	previewFn       func(context.Context, *exchangepb.PreviewConversionRequest, ...grpc.CallOption) (*exchangepb.PreviewConversionResponse, error)
+	getRatesFn func(context.Context, *exchangepb.GetExchangeRatesRequest, ...grpc.CallOption) (*exchangepb.GetExchangeRatesResponse, error)
+	convertFn  func(context.Context, *exchangepb.ConvertAmountRequest, ...grpc.CallOption) (*exchangepb.ConvertAmountResponse, error)
+	historyFn  func(context.Context, *exchangepb.GetExchangeHistoryRequest, ...grpc.CallOption) (*exchangepb.GetExchangeHistoryResponse, error)
+	previewFn  func(context.Context, *exchangepb.PreviewConversionRequest, ...grpc.CallOption) (*exchangepb.PreviewConversionResponse, error)
 }
 
 func (s *stubExchangeClient) GetExchangeRates(ctx context.Context, in *exchangepb.GetExchangeRatesRequest, opts ...grpc.CallOption) (*exchangepb.GetExchangeRatesResponse, error) {

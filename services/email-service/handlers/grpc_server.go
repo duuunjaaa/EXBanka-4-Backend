@@ -7,8 +7,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/email-service/queue"
+	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 )
 
 type Publisher interface {
