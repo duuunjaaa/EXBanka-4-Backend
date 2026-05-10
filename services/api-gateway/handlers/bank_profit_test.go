@@ -216,9 +216,9 @@ func TestBankInvestFund_GrpcError(t *testing.T) {
 func TestBankRedeemFund_Happy(t *testing.T) {
 	var capturedReq *pb_fund.WithdrawFundRequest
 	svc := &stubFundClient{
-		withdrawFundFn: func(_ context.Context, req *pb_fund.WithdrawFundRequest, _ ...grpc.CallOption) (*pb_fund.FundResponse, error) {
+		withdrawFundFn: func(_ context.Context, req *pb_fund.WithdrawFundRequest, _ ...grpc.CallOption) (*pb_fund.WithdrawFundResponse, error) {
 			capturedReq = req
-			return sampleFund(), nil
+			return &pb_fund.WithdrawFundResponse{Pending: false, Fund: sampleFund()}, nil
 		},
 	}
 
@@ -245,7 +245,7 @@ func TestBankRedeemFund_BadBody(t *testing.T) {
 
 func TestBankRedeemFund_GrpcError(t *testing.T) {
 	svc := &stubFundClient{
-		withdrawFundFn: func(_ context.Context, _ *pb_fund.WithdrawFundRequest, _ ...grpc.CallOption) (*pb_fund.FundResponse, error) {
+		withdrawFundFn: func(_ context.Context, _ *pb_fund.WithdrawFundRequest, _ ...grpc.CallOption) (*pb_fund.WithdrawFundResponse, error) {
 			return nil, status.Error(codes.NotFound, "position not found")
 		},
 	}

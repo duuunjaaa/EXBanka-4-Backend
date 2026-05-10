@@ -19,12 +19,12 @@ import (
 // ---- stub client ----
 
 type stubOrderClient struct {
-	createOrderFn    func(context.Context, *pb.CreateOrderRequest, ...grpc.CallOption) (*pb.CreateOrderResponse, error)
-	listOrdersFn     func(context.Context, *pb.ListOrdersRequest, ...grpc.CallOption) (*pb.ListOrdersResponse, error)
-	getOrderByIdFn   func(context.Context, *pb.GetOrderByIdRequest, ...grpc.CallOption) (*pb.GetOrderByIdResponse, error)
-	approveOrderFn   func(context.Context, *pb.ApproveOrderRequest, ...grpc.CallOption) (*pb.ApproveOrderResponse, error)
-	declineOrderFn   func(context.Context, *pb.DeclineOrderRequest, ...grpc.CallOption) (*pb.DeclineOrderResponse, error)
-	cancelOrderFn    func(context.Context, *pb.CancelOrderRequest, ...grpc.CallOption) (*pb.CancelOrderResponse, error)
+	createOrderFn       func(context.Context, *pb.CreateOrderRequest, ...grpc.CallOption) (*pb.CreateOrderResponse, error)
+	listOrdersFn        func(context.Context, *pb.ListOrdersRequest, ...grpc.CallOption) (*pb.ListOrdersResponse, error)
+	getOrderByIdFn      func(context.Context, *pb.GetOrderByIdRequest, ...grpc.CallOption) (*pb.GetOrderByIdResponse, error)
+	approveOrderFn      func(context.Context, *pb.ApproveOrderRequest, ...grpc.CallOption) (*pb.ApproveOrderResponse, error)
+	declineOrderFn      func(context.Context, *pb.DeclineOrderRequest, ...grpc.CallOption) (*pb.DeclineOrderResponse, error)
+	cancelOrderFn       func(context.Context, *pb.CancelOrderRequest, ...grpc.CallOption) (*pb.CancelOrderResponse, error)
 	cancelPortionsFn    func(context.Context, *pb.CancelOrderPortionsRequest, ...grpc.CallOption) (*pb.CancelOrderPortionsResponse, error)
 	getActuaryProfitsFn func(context.Context, *pb.GetActuaryProfitsRequest, ...grpc.CallOption) (*pb.GetActuaryProfitsResponse, error)
 }
@@ -385,7 +385,7 @@ func TestCreateOrder_FundPurchase_Happy(t *testing.T) {
 	w := serveHandlerFull(CreateOrder(ordSvc, fundSvc), "POST", "/orders", "/orders", body, makeSupervisorToken())
 	assert.Equal(t, http.StatusCreated, w.Code)
 	require.NotNil(t, capturedReq)
-	assert.Equal(t, int64(99), capturedReq.AccountId)  // fund's account used
+	assert.Equal(t, int64(99), capturedReq.AccountId) // fund's account used
 	assert.Equal(t, int64(3), capturedReq.FundId)
 }
 

@@ -8,11 +8,14 @@ import (
 	"net/mail"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
 	authpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
 	emailpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	pb_fund "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -147,7 +150,7 @@ func GetEmployeeById(client pb.EmployeeServiceClient) gin.HandlerFunc {
 // @Failure      500   {object}  map[string]string
 // @Security     BearerAuth
 // @Router       /employees/{id} [put]
-func UpdateEmployee(client pb.EmployeeServiceClient) gin.HandlerFunc {
+func UpdateEmployee(empClient pb.EmployeeServiceClient, fundClient pb_fund.FundServiceClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
@@ -181,9 +184,33 @@ func UpdateEmployee(client pb.EmployeeServiceClient) gin.HandlerFunc {
 			return
 		}
 
+		// If SUPERVISOR is not in the new permissions, transfer any funds managed
+		// by this employee to the admin performing the action. Fund transfer happens
+		// first so a failure leaves permissions untouched.
+		newHasSupervisor := false
+		for _, p := range req.Permissions {
+			if strings.ToUpper(p) == "SUPERVISOR" {
+				newHasSupervisor = true
+				break
+			}
+		}
+		if !newHasSupervisor {
+			if adminId, tokenErr := middleware.GetUserIDFromToken(c); tokenErr == nil {
+				tCtx, tCancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+				defer tCancel()
+				if _, err := fundClient.TransferFundsByManager(tCtx, &pb_fund.TransferFundsByManagerRequest{
+					OldManagerId: id,
+					NewManagerId: adminId,
+				}); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to transfer fund ownership"})
+					return
+				}
+			}
+		}
+
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
-		resp, err := client.UpdateEmployee(ctx, &pb.UpdateEmployeeRequest{
+		resp, err := empClient.UpdateEmployee(ctx, &pb.UpdateEmployeeRequest{
 			Id:          id,
 			FirstName:   req.FirstName,
 			LastName:    req.LastName,
