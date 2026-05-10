@@ -31,18 +31,19 @@ func makeSupervisorToken() string {
 // ---- stub fund client ----
 
 type stubFundClient struct {
-	pingFn                func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
-	createFundFn          func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	listFundsFn           func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
-	getFundFn             func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	updateFundFn          func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	deleteFundFn          func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
-	investFundFn          func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	withdrawFundFn        func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	getBankPositionsFn    func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
-	validateFundAccountFn func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
-	updateFundHoldingFn   func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
-	getMyPositionsFn      func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
+	pingFn                   func(context.Context, *pb.PingRequest, ...grpc.CallOption) (*pb.PingResponse, error)
+	createFundFn             func(context.Context, *pb.CreateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	listFundsFn              func(context.Context, *pb.ListFundsRequest, ...grpc.CallOption) (*pb.ListFundsResponse, error)
+	getFundFn                func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	updateFundFn             func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	deleteFundFn             func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
+	investFundFn             func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	withdrawFundFn           func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	getBankPositionsFn       func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
+	validateFundAccountFn    func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
+	updateFundHoldingFn      func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
+	getMyPositionsFn         func(context.Context, *pb.GetMyPositionsRequest, ...grpc.CallOption) (*pb.GetMyPositionsResponse, error)
+	transferFundsByManagerFn func(context.Context, *pb.TransferFundsByManagerRequest, ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -116,6 +117,12 @@ func (s *stubFundClient) GetMyPositions(ctx context.Context, in *pb.GetMyPositio
 		return s.getMyPositionsFn(ctx, in, opts...)
 	}
 	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubFundClient) TransferFundsByManager(ctx context.Context, in *pb.TransferFundsByManagerRequest, opts ...grpc.CallOption) (*pb.TransferFundsByManagerResponse, error) {
+	if s.transferFundsByManagerFn != nil {
+		return s.transferFundsByManagerFn(ctx, in, opts...)
+	}
+	return &pb.TransferFundsByManagerResponse{}, nil
 }
 
 // sampleFund returns a sample FundResponse.

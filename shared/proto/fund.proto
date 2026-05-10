@@ -13,6 +13,7 @@ service FundService {
   rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
   rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
   rpc GetMyPositions(GetMyPositionsRequest) returns (GetMyPositionsResponse);
+  rpc TransferFundsByManager(TransferFundsByManagerRequest) returns (TransferFundsByManagerResponse);
   rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
   rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
 }
@@ -120,6 +121,16 @@ message GetMyPositionsRequest {
 }
 message GetMyPositionsResponse {
   repeated ClientFundPosition positions = 1;
+}
+
+// ── TransferFundsByManager ────────────────────────────────────────────────────
+
+message TransferFundsByManagerRequest {
+  int64 old_manager_id = 1;
+  int64 new_manager_id = 2;
+}
+message TransferFundsByManagerResponse {
+  int64 funds_transferred = 1;
 }
 
 // ── ValidateFundAccount ───────────────────────────────────────────────────────
