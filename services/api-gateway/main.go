@@ -122,7 +122,7 @@ func main() {
 	r.GET("/employees/:id", middleware.RequireRole("ADMIN"), handlers.GetEmployeeById(employeeClient))
 	r.GET("/employees", middleware.RequireRole("ADMIN"), handlers.GetEmployees(employeeClient))
 	r.GET("/employees/search", middleware.RequireRole("ADMIN"), handlers.SearchEmployees(employeeClient))
-	r.PUT("/employees/:id", middleware.RequireRole("ADMIN"), handlers.UpdateEmployee(employeeClient))
+	r.PUT("/employees/:id", middleware.RequireRole("ADMIN"), handlers.UpdateEmployee(employeeClient, fundClient))
 	r.POST("/employees", middleware.RequireRole("ADMIN"), handlers.CreateEmployee(employeeClient, authClient, emailClient))
 	r.GET("/api/actuaries", middleware.RequireRole("SUPERVISOR"), handlers.GetActuaries(employeeClient))
 	r.PUT("/api/actuaries/:id/limit", middleware.RequireRole("SUPERVISOR"), handlers.SetAgentLimit(employeeClient))
@@ -254,6 +254,11 @@ func main() {
 	r.DELETE("/investment/funds/:id", middleware.RequireRole("SUPERVISOR"), handlers.DeleteFund(fundClient))
 	r.POST("/investment/funds/:id/invest", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.InvestFund(fundClient))
 	r.POST("/investment/funds/:id/withdraw", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.WithdrawFund(fundClient))
+	r.GET("/client/funds/positions", middleware.RequireRole("CLIENT"), handlers.GetMyPositions(fundClient))
+	r.POST("/investment/funds/:id/securities/buy", middleware.RequireRole("SUPERVISOR"), handlers.BuyFundSecurities(fundClient, securitiesClient, orderClient))
+	r.POST("/investment/funds/:id/securities/sell", middleware.RequireRole("SUPERVISOR"), handlers.SellFundSecurities(fundClient, securitiesClient, orderClient))
+	r.GET("/investment/funds/:id/securities", middleware.RequireRole("SUPERVISOR"), handlers.GetFundSecurities(fundClient, securitiesClient))
+	r.GET("/investment/funds/:id/performance", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFundPerformanceHistory(fundClient))
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	if err := r.Run(":8083"); err != nil {

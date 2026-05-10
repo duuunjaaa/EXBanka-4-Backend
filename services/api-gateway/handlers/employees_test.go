@@ -8,11 +8,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	authpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
 	emailpb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	pb_fund "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -415,27 +418,27 @@ var validUpdateBody = `{
 
 func TestUpdateEmployee_InvalidId(t *testing.T) {
 	client := &stubEmpClient{}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/abc", validUpdateBody)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/abc", validUpdateBody)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestUpdateEmployee_BadJSON(t *testing.T) {
 	client := &stubEmpClient{}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", `{invalid}`)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", `{invalid}`)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestUpdateEmployee_MissingRequiredField(t *testing.T) {
 	client := &stubEmpClient{}
 	// missing last_name
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", `{"first_name":"Marko","email":"m@e.rs","username":"u"}`)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", `{"first_name":"Marko","email":"m@e.rs","username":"u"}`)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestUpdateEmployee_InvalidEmail(t *testing.T) {
 	client := &stubEmpClient{}
 	body := `{"first_name":"Marko","last_name":"M","email":"not-an-email","username":"u"}`
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", body)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", body)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
@@ -445,7 +448,7 @@ func TestUpdateEmployee_NotFound(t *testing.T) {
 			return nil, status.Error(codes.NotFound, "not found")
 		},
 	}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
@@ -455,7 +458,7 @@ func TestUpdateEmployee_Conflict(t *testing.T) {
 			return nil, status.Error(codes.AlreadyExists, "email already in use")
 		},
 	}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
 	assert.Equal(t, http.StatusConflict, w.Code)
 }
 
@@ -465,7 +468,7 @@ func TestUpdateEmployee_FailedPrecondition(t *testing.T) {
 			return nil, status.Error(codes.FailedPrecondition, "invalid state")
 		},
 	}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 }
 
@@ -475,7 +478,7 @@ func TestUpdateEmployee_InternalError(t *testing.T) {
 			return nil, fmt.Errorf("db error")
 		},
 	}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
@@ -486,7 +489,7 @@ func TestUpdateEmployee_Happy(t *testing.T) {
 			return &pb.UpdateEmployeeResponse{Employee: emp}, nil
 		},
 	}
-	w := serveHandler(UpdateEmployee(client), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
+	w := serveHandler(UpdateEmployee(client, &stubFundClient{}), "PUT", "/employees/:id", "/employees/1", validUpdateBody)
 	require.Equal(t, http.StatusOK, w.Code)
 	var resp employeeResponse
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
@@ -596,4 +599,80 @@ func TestToEmployeeResponse_NilPermissions(t *testing.T) {
 	r := toEmployeeResponse(emp)
 	assert.NotNil(t, r.Permissions)
 	assert.Len(t, r.Permissions, 0)
+}
+
+// ---- UpdateEmployee — supervisor removal / fund transfer ----
+
+func makeAdminToken() string {
+	claims := jwt.MapClaims{
+		"user_id": float64(99),
+		"role":    "EMPLOYEE",
+		"dozvole": []interface{}{"ADMIN", "SUPERVISOR"},
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(""))
+	return "Bearer " + tok
+}
+
+var supervisorRemovalBody = `{
+	"first_name":"Ana","last_name":"Anić",
+	"email":"ana@exbanka.rs","username":"aanc",
+	"permissions":["READ"]
+}`
+
+func TestUpdateEmployee_SupervisorRemovedTransfersFunds(t *testing.T) {
+	transferCalled := false
+	fundStub := &stubFundClient{
+		transferFundsByManagerFn: func(_ context.Context, req *pb_fund.TransferFundsByManagerRequest, _ ...grpc.CallOption) (*pb_fund.TransferFundsByManagerResponse, error) {
+			transferCalled = true
+			assert.Equal(t, int64(1), req.OldManagerId)
+			assert.Equal(t, int64(99), req.NewManagerId) // admin user_id from token
+			return &pb_fund.TransferFundsByManagerResponse{FundsTransferred: 2}, nil
+		},
+	}
+	empStub := &stubEmpClient{
+		updateFn: func(_ context.Context, _ *pb.UpdateEmployeeRequest, _ ...grpc.CallOption) (*pb.UpdateEmployeeResponse, error) {
+			return &pb.UpdateEmployeeResponse{Employee: sampleEmployee()}, nil
+		},
+	}
+	w := serveHandlerFull(UpdateEmployee(empStub, fundStub), "PUT", "/employees/:id", "/employees/1", supervisorRemovalBody, makeAdminToken())
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, transferCalled, "fund transfer should have been called")
+}
+
+func TestUpdateEmployee_SupervisorRemovedFundTransferFails(t *testing.T) {
+	empUpdateCalled := false
+	fundStub := &stubFundClient{
+		transferFundsByManagerFn: func(_ context.Context, _ *pb_fund.TransferFundsByManagerRequest, _ ...grpc.CallOption) (*pb_fund.TransferFundsByManagerResponse, error) {
+			return nil, fmt.Errorf("fund db error")
+		},
+	}
+	empStub := &stubEmpClient{
+		updateFn: func(_ context.Context, _ *pb.UpdateEmployeeRequest, _ ...grpc.CallOption) (*pb.UpdateEmployeeResponse, error) {
+			empUpdateCalled = true
+			return &pb.UpdateEmployeeResponse{Employee: sampleEmployee()}, nil
+		},
+	}
+	w := serveHandlerFull(UpdateEmployee(empStub, fundStub), "PUT", "/employees/:id", "/employees/1", supervisorRemovalBody, makeAdminToken())
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.False(t, empUpdateCalled, "employee update should not have been called after fund transfer failure")
+}
+
+func TestUpdateEmployee_SupervisorKeptNoTransfer(t *testing.T) {
+	transferCalled := false
+	fundStub := &stubFundClient{
+		transferFundsByManagerFn: func(_ context.Context, _ *pb_fund.TransferFundsByManagerRequest, _ ...grpc.CallOption) (*pb_fund.TransferFundsByManagerResponse, error) {
+			transferCalled = true
+			return &pb_fund.TransferFundsByManagerResponse{}, nil
+		},
+	}
+	empStub := &stubEmpClient{
+		updateFn: func(_ context.Context, _ *pb.UpdateEmployeeRequest, _ ...grpc.CallOption) (*pb.UpdateEmployeeResponse, error) {
+			return &pb.UpdateEmployeeResponse{Employee: sampleEmployee()}, nil
+		},
+	}
+	body := `{"first_name":"Ana","last_name":"Anić","email":"ana@exbanka.rs","username":"aanc","permissions":["SUPERVISOR"]}`
+	w := serveHandlerFull(UpdateEmployee(empStub, fundStub), "PUT", "/employees/:id", "/employees/1", body, makeAdminToken())
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.False(t, transferCalled, "fund transfer should NOT be called when SUPERVISOR is kept")
 }
