@@ -122,6 +122,7 @@ type Order struct {
 	IsAon             bool                   `protobuf:"varint,17,opt,name=is_aon,json=isAon,proto3" json:"is_aon,omitempty"`
 	IsMargin          bool                   `protobuf:"varint,18,opt,name=is_margin,json=isMargin,proto3" json:"is_margin,omitempty"`
 	AccountId         int64                  `protobuf:"varint,19,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	FundId            int64                  `protobuf:"varint,20,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -289,6 +290,13 @@ func (x *Order) GetAccountId() int64 {
 	return 0
 }
 
+func (x *Order) GetFundId() int64 {
+	if x != nil {
+		return x.FundId
+	}
+	return 0
+}
+
 type CreateOrderRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -300,7 +308,8 @@ type CreateOrderRequest struct {
 	IsAon         bool                   `protobuf:"varint,7,opt,name=is_aon,json=isAon,proto3" json:"is_aon,omitempty"`
 	IsMargin      bool                   `protobuf:"varint,8,opt,name=is_margin,json=isMargin,proto3" json:"is_margin,omitempty"`
 	AccountId     int64                  `protobuf:"varint,9,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	Direction     string                 `protobuf:"bytes,10,opt,name=direction,proto3" json:"direction,omitempty"` // BUY or SELL
+	Direction     string                 `protobuf:"bytes,10,opt,name=direction,proto3" json:"direction,omitempty"`          // BUY or SELL
+	FundId        int64                  `protobuf:"varint,11,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"` // 0 = not a fund order
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -403,6 +412,13 @@ func (x *CreateOrderRequest) GetDirection() string {
 		return x.Direction
 	}
 	return ""
+}
+
+func (x *CreateOrderRequest) GetFundId() int64 {
+	if x != nil {
+		return x.FundId
+	}
+	return 0
 }
 
 type CreateOrderResponse struct {
@@ -1156,7 +1172,7 @@ const file_order_proto_rawDesc = "" +
 	"\vorder.proto\x12\x05order\"\r\n" +
 	"\vPingRequest\"(\n" +
 	"\fPingResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\xd1\x04\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\xea\x04\n" +
 	"\x05Order\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x19\n" +
@@ -1183,7 +1199,8 @@ const file_order_proto_rawDesc = "" +
 	"\x06is_aon\x18\x11 \x01(\bR\x05isAon\x12\x1b\n" +
 	"\tis_margin\x18\x12 \x01(\bR\bisMargin\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x13 \x01(\x03R\taccountId\"\xb2\x02\n" +
+	"account_id\x18\x13 \x01(\x03R\taccountId\x12\x17\n" +
+	"\afund_id\x18\x14 \x01(\x03R\x06fundId\"\xcb\x02\n" +
 	"\x12CreateOrderRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1b\n" +
 	"\tuser_type\x18\x02 \x01(\tR\buserType\x12\x19\n" +
@@ -1198,7 +1215,8 @@ const file_order_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\t \x01(\x03R\taccountId\x12\x1c\n" +
 	"\tdirection\x18\n" +
-	" \x01(\tR\tdirection\"\x94\x01\n" +
+	" \x01(\tR\tdirection\x12\x17\n" +
+	"\afund_id\x18\v \x01(\x03R\x06fundId\"\x94\x01\n" +
 	"\x13CreateOrderResponse\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\x03R\aorderId\x12\x1d\n" +
 	"\n" +

@@ -12,7 +12,7 @@ func GetApprovedActiveOrders(ctx context.Context, db *sql.DB) ([]models.Order, e
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, user_id, user_type, asset_id, order_type, quantity, contract_size,
 		       price_per_unit, limit_value, stop_value, direction, status, approved_by,
-		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id
+		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id, fund_id
 		FROM orders
 		WHERE status = 'APPROVED' AND is_done = false`)
 	if err != nil {
@@ -26,7 +26,7 @@ func GetApprovedActiveOrders(ctx context.Context, db *sql.DB) ([]models.Order, e
 		if err := rows.Scan(
 			&o.ID, &o.UserID, &o.UserType, &o.AssetID, &o.OrderType, &o.Quantity, &o.ContractSize,
 			&o.PricePerUnit, &o.LimitValue, &o.StopValue, &o.Direction, &o.Status, &o.ApprovedBy,
-			&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID,
+			&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID, &o.FundID,
 		); err != nil {
 			return nil, err
 		}
@@ -40,11 +40,11 @@ func GetOrderByID(ctx context.Context, db *sql.DB, id int64) (models.Order, erro
 	err := db.QueryRowContext(ctx, `
 		SELECT id, user_id, user_type, asset_id, order_type, quantity, contract_size,
 		       price_per_unit, limit_value, stop_value, direction, status, approved_by,
-		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id
+		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id, fund_id
 		FROM orders WHERE id = $1`, id).Scan(
 		&o.ID, &o.UserID, &o.UserType, &o.AssetID, &o.OrderType, &o.Quantity, &o.ContractSize,
 		&o.PricePerUnit, &o.LimitValue, &o.StopValue, &o.Direction, &o.Status, &o.ApprovedBy,
-		&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID,
+		&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID, &o.FundID,
 	)
 	return o, err
 }
@@ -55,13 +55,13 @@ func InsertOrder(ctx context.Context, db *sql.DB, o *models.Order) (int64, error
 		INSERT INTO orders
 		  (user_id, user_type, asset_id, order_type, quantity, contract_size,
 		   price_per_unit, limit_value, stop_value, direction, status,
-		   remaining_portions, after_hours, is_aon, is_margin, account_id,
+		   remaining_portions, after_hours, is_aon, is_margin, account_id, fund_id,
 		   last_modification)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING id`,
 		o.UserID, o.UserType, o.AssetID, o.OrderType, o.Quantity, o.ContractSize,
 		o.PricePerUnit, o.LimitValue, o.StopValue, o.Direction, o.Status,
-		o.RemainingPortions, o.AfterHours, o.IsAON, o.IsMargin, o.AccountID,
+		o.RemainingPortions, o.AfterHours, o.IsAON, o.IsMargin, o.AccountID, o.FundID,
 		time.Now(),
 	).Scan(&id)
 	return id, err
@@ -99,7 +99,7 @@ func GetPendingOrders(ctx context.Context, db *sql.DB) ([]models.Order, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, user_id, user_type, asset_id, order_type, quantity, contract_size,
 		       price_per_unit, limit_value, stop_value, direction, status, approved_by,
-		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id
+		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id, fund_id
 		FROM orders
 		WHERE status = 'PENDING'`)
 	if err != nil {
@@ -113,7 +113,7 @@ func GetPendingOrders(ctx context.Context, db *sql.DB) ([]models.Order, error) {
 		if err := rows.Scan(
 			&o.ID, &o.UserID, &o.UserType, &o.AssetID, &o.OrderType, &o.Quantity, &o.ContractSize,
 			&o.PricePerUnit, &o.LimitValue, &o.StopValue, &o.Direction, &o.Status, &o.ApprovedBy,
-			&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID,
+			&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID, &o.FundID,
 		); err != nil {
 			return nil, err
 		}
@@ -155,7 +155,7 @@ func ListOrders(ctx context.Context, db *sql.DB, statusFilter string, agentID in
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, user_id, user_type, asset_id, order_type, quantity, contract_size,
 		       price_per_unit, limit_value, stop_value, direction, status, approved_by,
-		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id
+		       is_done, last_modification, remaining_portions, after_hours, is_aon, is_margin, account_id, fund_id
 		FROM orders
 		WHERE ($1 = '' OR $1 = 'ALL' OR status::text = $1)
 		  AND ($2 = 0 OR user_id = $2)
@@ -173,7 +173,7 @@ func ListOrders(ctx context.Context, db *sql.DB, statusFilter string, agentID in
 		if err := rows.Scan(
 			&o.ID, &o.UserID, &o.UserType, &o.AssetID, &o.OrderType, &o.Quantity, &o.ContractSize,
 			&o.PricePerUnit, &o.LimitValue, &o.StopValue, &o.Direction, &o.Status, &o.ApprovedBy,
-			&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID,
+			&o.IsDone, &o.LastModification, &o.RemainingPortions, &o.AfterHours, &o.IsAON, &o.IsMargin, &o.AccountID, &o.FundID,
 		); err != nil {
 			return nil, err
 		}

@@ -31,6 +31,7 @@ message Order {
   bool   is_aon             = 17;
   bool   is_margin          = 18;
   int64  account_id         = 19;
+  int64  fund_id            = 20;
 }
 
 // ── CreateOrder ───────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ message CreateOrderRequest {
   bool   is_margin   = 8;
   int64  account_id  = 9;
   string direction   = 10; // BUY or SELL
+  int64  fund_id     = 11; // 0 = not a fund order
 }
 
 message CreateOrderResponse {

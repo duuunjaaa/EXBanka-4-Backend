@@ -74,6 +74,38 @@ func GetCallerRoleFromToken(c *gin.Context) string {
 	return ""
 }
 
+// CallerHasPermission reports whether the authenticated caller has the given permission
+// in their dozvole array (or is ADMIN, which satisfies any permission check).
+func CallerHasPermission(c *gin.Context, perm string) bool {
+	header := c.GetHeader("Authorization")
+	if !strings.HasPrefix(header, "Bearer ") {
+		return false
+	}
+	tokenStr := strings.TrimPrefix(header, "Bearer ")
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return false
+	}
+	target := strings.ToUpper(perm)
+	dozvole, _ := claims["dozvole"].([]interface{})
+	for _, d := range dozvole {
+		s := strings.ToUpper(fmt.Sprintf("%v", d))
+		if s == "ADMIN" || s == target {
+			return true
+		}
+	}
+	return false
+}
+
 // RequireRole returns a Gin middleware that validates the JWT and checks that
 // the caller has at least one of the given roles (or ADMIN, which bypasses all role checks).
 func RequireRole(roles ...string) gin.HandlerFunc {

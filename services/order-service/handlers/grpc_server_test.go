@@ -54,7 +54,7 @@ var orderCols = []string{
 	"id", "user_id", "user_type", "asset_id", "order_type",
 	"quantity", "contract_size", "price_per_unit", "limit_value", "stop_value",
 	"direction", "status", "approved_by", "is_done", "last_modification",
-	"remaining_portions", "after_hours", "is_aon", "is_margin", "account_id",
+	"remaining_portions", "after_hours", "is_aon", "is_margin", "account_id", "fund_id",
 }
 
 // addOrderRow appends a fully-populated order row to a sqlmock Rows object.
@@ -67,7 +67,7 @@ func addOrderRow(rows *sqlmock.Rows, id, userID int64, userType string, assetID 
 		id, userID, userType, assetID, orderType,
 		quantity, contractSize, pricePerUnit, limitVal, stopVal,
 		direction, orderStatus, approvedBy, isDone, ts,
-		remaining, afterHours, isAON, isMargin, accountID,
+		remaining, afterHours, isAON, isMargin, accountID, int64(0),
 	)
 }
 

@@ -573,3 +573,108 @@ func TestGetBankPositions_DBError(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }
+
+// ── ValidateFundAccount ───────────────────────────────────────────────────────
+
+func TestValidateFundAccount_Happy_Liquid(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery("SELECT account_id, manager_id, liquid_assets").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id", "manager_id", "liquid_assets"}).
+			AddRow(int64(42), int64(5), float64(100000)))
+
+	resp, err := s.ValidateFundAccount(context.Background(), &pb.ValidateFundAccountRequest{
+		FundId: 1, ManagerId: 5, RequiredAmount: 50000,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(42), resp.AccountId)
+	assert.True(t, resp.IsLiquid)
+	assert.InDelta(t, 100000.0, resp.LiquidAssets, 0.01)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestValidateFundAccount_InsufficientLiquidity(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery("SELECT account_id, manager_id, liquid_assets").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id", "manager_id", "liquid_assets"}).
+			AddRow(int64(42), int64(5), float64(10000)))
+
+	resp, err := s.ValidateFundAccount(context.Background(), &pb.ValidateFundAccountRequest{
+		FundId: 1, ManagerId: 5, RequiredAmount: 50000,
+	})
+	require.NoError(t, err)
+	assert.False(t, resp.IsLiquid)
+	assert.InDelta(t, 10000.0, resp.LiquidAssets, 0.01)
+}
+
+func TestValidateFundAccount_WrongManager(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery("SELECT account_id, manager_id, liquid_assets").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id", "manager_id", "liquid_assets"}).
+			AddRow(int64(42), int64(99), float64(100000)))
+
+	_, err := s.ValidateFundAccount(context.Background(), &pb.ValidateFundAccountRequest{
+		FundId: 1, ManagerId: 5, RequiredAmount: 1000,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+}
+
+func TestValidateFundAccount_NotFound(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectQuery("SELECT account_id, manager_id, liquid_assets").
+		WithArgs(int64(999)).
+		WillReturnError(sql.ErrNoRows)
+
+	_, err := s.ValidateFundAccount(context.Background(), &pb.ValidateFundAccountRequest{
+		FundId: 999, ManagerId: 5, RequiredAmount: 1000,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+// ── UpdateFundHolding ─────────────────────────────────────────────────────────
+
+func TestUpdateFundHolding_Buy(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectBegin()
+	fundMock.ExpectExec("UPDATE investment_funds SET liquid_assets = liquid_assets -").
+		WithArgs(500.0, int64(1)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("INSERT INTO fund_portfolio_positions").
+		WithArgs(int64(1), int64(10), int64(5)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectCommit()
+
+	_, err := s.UpdateFundHolding(context.Background(), &pb.UpdateFundHoldingRequest{
+		FundId: 1, ListingId: 10, Quantity: 5, Price: 100.0, Direction: "BUY",
+	})
+	require.NoError(t, err)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}
+
+func TestUpdateFundHolding_Sell(t *testing.T) {
+	s, fundMock, _, _ := newFundServer(t, &mockAccountClient{})
+
+	fundMock.ExpectBegin()
+	fundMock.ExpectExec("UPDATE investment_funds SET liquid_assets = liquid_assets \\+").
+		WithArgs(300.0, int64(1)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectExec("INSERT INTO fund_portfolio_positions").
+		WithArgs(int64(1), int64(10), int64(-3)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	fundMock.ExpectCommit()
+
+	_, err := s.UpdateFundHolding(context.Background(), &pb.UpdateFundHoldingRequest{
+		FundId: 1, ListingId: 10, Quantity: 3, Price: 100.0, Direction: "SELL",
+	})
+	require.NoError(t, err)
+	require.NoError(t, fundMock.ExpectationsWereMet())
+}

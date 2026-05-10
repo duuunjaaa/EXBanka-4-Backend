@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	pb_emp "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	pb_fund "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -132,13 +134,13 @@ func (s *stubEmployeeClient) GetActuaryPerformers(_ context.Context, _ *pb_emp.G
 // ---- CreateOrder ----
 
 func TestCreateOrder_BadJSON(t *testing.T) {
-	w := serveHandlerFull(CreateOrder(&stubOrderClient{}), "POST", "/orders", "/orders", `{bad}`, makeClientToken())
+	w := serveHandlerFull(CreateOrder(&stubOrderClient{}, &stubFundClient{}), "POST", "/orders", "/orders", `{bad}`, makeClientToken())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestCreateOrder_NoToken(t *testing.T) {
 	body := `{"assetId":1,"quantity":10,"accountId":42,"direction":"BUY"}`
-	w := serveHandlerFull(CreateOrder(&stubOrderClient{}), "POST", "/orders", "/orders", body, "")
+	w := serveHandlerFull(CreateOrder(&stubOrderClient{}, &stubFundClient{}), "POST", "/orders", "/orders", body, "")
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -149,7 +151,7 @@ func TestCreateOrder_GrpcError(t *testing.T) {
 		},
 	}
 	body := `{"assetId":1,"quantity":10,"accountId":42,"direction":"BUY"}`
-	w := serveHandlerFull(CreateOrder(client), "POST", "/orders", "/orders", body, makeClientToken())
+	w := serveHandlerFull(CreateOrder(client, &stubFundClient{}), "POST", "/orders", "/orders", body, makeClientToken())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
@@ -160,7 +162,7 @@ func TestCreateOrder_Happy(t *testing.T) {
 		},
 	}
 	body := `{"assetId":1,"quantity":10,"accountId":42,"direction":"BUY"}`
-	w := serveHandlerFull(CreateOrder(client), "POST", "/orders", "/orders", body, makeClientToken())
+	w := serveHandlerFull(CreateOrder(client, &stubFundClient{}), "POST", "/orders", "/orders", body, makeClientToken())
 	assert.Equal(t, http.StatusCreated, w.Code)
 }
 
@@ -361,4 +363,84 @@ func TestOrderError_PermissionDenied(t *testing.T) {
 	}
 	w := serveHandler(ListOrders(client, &stubEmployeeClient{}, &stubSecuritiesClient{}), "GET", "/orders", "/orders", "")
 	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+// ── CreateOrder with purchaseFor=FUND ─────────────────────────────────────────
+
+func TestCreateOrder_FundPurchase_Happy(t *testing.T) {
+	var capturedReq *pb.CreateOrderRequest
+	ordSvc := &stubOrderClient{
+		createOrderFn: func(_ context.Context, req *pb.CreateOrderRequest, _ ...grpc.CallOption) (*pb.CreateOrderResponse, error) {
+			capturedReq = req
+			return &pb.CreateOrderResponse{OrderId: 10, OrderType: "LIMIT", Status: "PENDING"}, nil
+		},
+	}
+	fundSvc := &stubFundClient{
+		validateFundAccountFn: func(_ context.Context, req *pb_fund.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb_fund.ValidateFundAccountResponse, error) {
+			return &pb_fund.ValidateFundAccountResponse{AccountId: 99, IsLiquid: true, LiquidAssets: 500000}, nil
+		},
+	}
+
+	body := `{"assetId":5,"quantity":10,"accountId":1,"direction":"BUY","purchaseFor":"FUND","fundId":3,"limitValue":100.0}`
+	w := serveHandlerFull(CreateOrder(ordSvc, fundSvc), "POST", "/orders", "/orders", body, makeSupervisorToken())
+	assert.Equal(t, http.StatusCreated, w.Code)
+	require.NotNil(t, capturedReq)
+	assert.Equal(t, int64(99), capturedReq.AccountId)  // fund's account used
+	assert.Equal(t, int64(3), capturedReq.FundId)
+}
+
+func TestCreateOrder_FundPurchase_WrongManager(t *testing.T) {
+	fundSvc := &stubFundClient{
+		validateFundAccountFn: func(_ context.Context, _ *pb_fund.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb_fund.ValidateFundAccountResponse, error) {
+			return nil, status.Error(codes.PermissionDenied, "not the fund manager")
+		},
+	}
+	body := `{"assetId":5,"quantity":10,"accountId":1,"direction":"BUY","purchaseFor":"FUND","fundId":3,"limitValue":100.0}`
+	w := serveHandlerFull(CreateOrder(&stubOrderClient{}, fundSvc), "POST", "/orders", "/orders", body, makeSupervisorToken())
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestCreateOrder_FundPurchase_InsufficientLiquidity(t *testing.T) {
+	fundSvc := &stubFundClient{
+		validateFundAccountFn: func(_ context.Context, _ *pb_fund.ValidateFundAccountRequest, _ ...grpc.CallOption) (*pb_fund.ValidateFundAccountResponse, error) {
+			return &pb_fund.ValidateFundAccountResponse{AccountId: 99, IsLiquid: false, LiquidAssets: 100}, nil
+		},
+	}
+	body := `{"assetId":5,"quantity":10,"accountId":1,"direction":"BUY","purchaseFor":"FUND","fundId":3,"limitValue":100.0}`
+	w := serveHandlerFull(CreateOrder(&stubOrderClient{}, fundSvc), "POST", "/orders", "/orders", body, makeSupervisorToken())
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCreateOrder_FundPurchase_NonSupervisorIgnored(t *testing.T) {
+	// A non-supervisor providing purchaseFor=FUND has the field ignored — standard order proceeds.
+	var capturedReq *pb.CreateOrderRequest
+	ordSvc := &stubOrderClient{
+		createOrderFn: func(_ context.Context, req *pb.CreateOrderRequest, _ ...grpc.CallOption) (*pb.CreateOrderResponse, error) {
+			capturedReq = req
+			return &pb.CreateOrderResponse{OrderId: 2, OrderType: "MARKET", Status: "APPROVED"}, nil
+		},
+	}
+	body := `{"assetId":5,"quantity":10,"accountId":1,"direction":"BUY","purchaseFor":"FUND","fundId":3,"limitValue":100.0}`
+	w := serveHandlerFull(CreateOrder(ordSvc, &stubFundClient{}), "POST", "/orders", "/orders", body, makeClientToken())
+	assert.Equal(t, http.StatusCreated, w.Code)
+	require.NotNil(t, capturedReq)
+	assert.Equal(t, int64(1), capturedReq.AccountId) // original accountId preserved, not fund account
+	assert.Equal(t, int64(0), capturedReq.FundId)    // fund_id not set
+}
+
+func TestCreateOrder_NoPurchaseFor_StandardFlow(t *testing.T) {
+	// No purchaseFor — uses standard flow, fund_id=0
+	var capturedReq *pb.CreateOrderRequest
+	ordSvc := &stubOrderClient{
+		createOrderFn: func(_ context.Context, req *pb.CreateOrderRequest, _ ...grpc.CallOption) (*pb.CreateOrderResponse, error) {
+			capturedReq = req
+			return &pb.CreateOrderResponse{OrderId: 1, OrderType: "MARKET", Status: "APPROVED"}, nil
+		},
+	}
+	body := `{"assetId":5,"quantity":10,"accountId":42,"direction":"BUY"}`
+	w := serveHandlerFull(CreateOrder(ordSvc, &stubFundClient{}), "POST", "/orders", "/orders", body, makeClientToken())
+	assert.Equal(t, http.StatusCreated, w.Code)
+	require.NotNil(t, capturedReq)
+	assert.Equal(t, int64(42), capturedReq.AccountId) // original accountId preserved
+	assert.Equal(t, int64(0), capturedReq.FundId)     // no fund
 }

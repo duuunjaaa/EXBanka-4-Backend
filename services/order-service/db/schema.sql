@@ -22,7 +22,8 @@ CREATE TABLE orders (
     after_hours        BOOLEAN         NOT NULL DEFAULT FALSE,
     is_aon             BOOLEAN         NOT NULL DEFAULT FALSE,
     is_margin          BOOLEAN         NOT NULL DEFAULT FALSE,
-    account_id         BIGINT          NOT NULL
+    account_id         BIGINT          NOT NULL,
+    fund_id            BIGINT          NOT NULL DEFAULT 0
 );
 
 CREATE TABLE order_portions (

@@ -10,6 +10,7 @@ import (
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/order-service/handlers"
 	pb_emp "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
 	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
+	pb_fund "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_loan "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/loan"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	pb_portfolio "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/portfolio"
@@ -81,11 +82,18 @@ func main() {
 	}
 	defer func() { _ = portfolioConn.Close() }()
 
+	fundConn, err := grpc.NewClient(os.Getenv("FUND_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to fund-service: %v", err)
+	}
+	defer func() { _ = fundConn.Close() }()
+
 	securitiesClient := pb_sec.NewSecuritiesServiceClient(secConn)
 	loanClient := pb_loan.NewLoanServiceClient(loanConn)
 	employeeClient := pb_emp.NewEmployeeServiceClient(empConn)
 	exchangeClient := pb_exchange.NewExchangeServiceClient(exchangeConn)
 	portfolioClient := pb_portfolio.NewPortfolioServiceClient(portfolioConn)
+	fundClient := pb_fund.NewFundServiceClient(fundConn)
 
 	lis, err := net.Listen("tcp", grpcPort)
 	if err != nil {
@@ -117,6 +125,7 @@ func main() {
 		EmployeeClient:   employeeClient,
 		PortfolioClient:  portfolioClient,
 		ExchangeClient:   exchangeClient,
+		FundClient:       fundClient,
 	}
 	scheduler.Start()
 

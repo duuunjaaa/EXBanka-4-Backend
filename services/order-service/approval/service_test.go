@@ -15,7 +15,7 @@ var orderCols = []string{
 	"id", "user_id", "user_type", "asset_id", "order_type",
 	"quantity", "contract_size", "price_per_unit", "limit_value", "stop_value",
 	"direction", "status", "approved_by", "is_done", "last_modification",
-	"remaining_portions", "after_hours", "is_aon", "is_margin", "account_id",
+	"remaining_portions", "after_hours", "is_aon", "is_margin", "account_id", "fund_id",
 }
 
 func newMocks(t *testing.T) (*sql.DB, sqlmock.Sqlmock, *sql.DB, sqlmock.Sqlmock) {
@@ -38,7 +38,7 @@ func addOrderRowDir(rows *sqlmock.Rows, id, userID int64, userType, status strin
 		id, userID, userType, int64(5), "MARKET",
 		quantity, contractSize, pricePerUnit, nil, nil,
 		direction, status, nil, false, ts,
-		quantity, false, false, false, int64(42),
+		quantity, false, false, false, int64(42), int64(0),
 	)
 }
 

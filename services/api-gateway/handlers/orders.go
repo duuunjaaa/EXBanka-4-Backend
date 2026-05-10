@@ -9,6 +9,7 @@ import (
 
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/api-gateway/middleware"
 	pb_emp "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	pb_fund "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	pb_sec "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
 	"github.com/gin-gonic/gin"
@@ -53,18 +54,21 @@ func orderError(c *gin.Context, err error) {
 	}
 }
 
-// CreateOrder handles POST /orders
-func CreateOrder(orderClient pb.OrderServiceClient) gin.HandlerFunc {
+// CreateOrder handles POST /orders and POST /client/orders.
+// fundClient is used when purchaseFor="FUND" to validate fund ownership and liquidity.
+func CreateOrder(orderClient pb.OrderServiceClient, fundClient pb_fund.FundServiceClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body struct {
-			AssetId    int64   `json:"assetId"    binding:"required"`
-			Quantity   int32   `json:"quantity"   binding:"required"`
-			LimitValue float64 `json:"limitValue"`
-			StopValue  float64 `json:"stopValue"`
-			IsAon      bool    `json:"isAon"`
-			IsMargin   bool    `json:"isMargin"`
-			AccountId  int64   `json:"accountId"  binding:"required"`
-			Direction  string  `json:"direction"  binding:"required"`
+			AssetId     int64   `json:"assetId"    binding:"required"`
+			Quantity    int32   `json:"quantity"   binding:"required"`
+			LimitValue  float64 `json:"limitValue"`
+			StopValue   float64 `json:"stopValue"`
+			IsAon       bool    `json:"isAon"`
+			IsMargin    bool    `json:"isMargin"`
+			AccountId   int64   `json:"accountId"  binding:"required"`
+			Direction   string  `json:"direction"  binding:"required"`
+			PurchaseFor string  `json:"purchaseFor"` // "BANK" | "FUND" | ""
+			FundId      int64   `json:"fundId"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -81,6 +85,36 @@ func CreateOrder(orderClient pb.OrderServiceClient) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 		defer cancel()
 
+		fundID := int64(0)
+		if body.PurchaseFor == "FUND" && body.FundId != 0 && middleware.CallerHasPermission(c, "SUPERVISOR") {
+			// Estimate required liquidity from limit value (0 for market orders → any liquidity passes)
+			requiredAmount := float64(body.Quantity) * body.LimitValue
+
+			vResp, vErr := fundClient.ValidateFundAccount(ctx, &pb_fund.ValidateFundAccountRequest{
+				FundId:         body.FundId,
+				ManagerId:      userID,
+				RequiredAmount: requiredAmount,
+			})
+			if vErr != nil {
+				switch status.Code(vErr) {
+				case codes.NotFound:
+					c.JSON(http.StatusNotFound, gin.H{"error": "fund not found"})
+				case codes.PermissionDenied:
+					c.JSON(http.StatusForbidden, gin.H{"error": "you are not the manager of this fund"})
+				default:
+					c.JSON(http.StatusInternalServerError, gin.H{"error": vErr.Error()})
+				}
+				return
+			}
+			if !vResp.IsLiquid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient fund liquidity"})
+				return
+			}
+			body.AccountId = vResp.AccountId
+			fundID = body.FundId
+		}
+		// Non-supervisors providing purchaseFor=FUND: field is silently ignored, standard flow applies.
+
 		resp, err := orderClient.CreateOrder(ctx, &pb.CreateOrderRequest{
 			UserId:     userID,
 			UserType:   userType,
@@ -92,6 +126,7 @@ func CreateOrder(orderClient pb.OrderServiceClient) gin.HandlerFunc {
 			IsMargin:   body.IsMargin,
 			AccountId:  body.AccountId,
 			Direction:  body.Direction,
+			FundId:     fundID,
 		})
 		if err != nil {
 			orderError(c, err)

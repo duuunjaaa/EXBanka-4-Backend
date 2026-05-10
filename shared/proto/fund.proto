@@ -12,6 +12,8 @@ service FundService {
   rpc InvestFund(InvestFundRequest) returns (FundResponse);
   rpc WithdrawFund(WithdrawFundRequest) returns (FundResponse);
   rpc GetBankPositions(GetBankPositionsRequest) returns (GetBankPositionsResponse);
+  rpc ValidateFundAccount(ValidateFundAccountRequest) returns (ValidateFundAccountResponse);
+  rpc UpdateFundHolding(UpdateFundHoldingRequest) returns (UpdateFundHoldingResponse);
 }
 
 message PingRequest {}
@@ -97,3 +99,27 @@ message GetBankPositionsRequest {}
 message GetBankPositionsResponse {
   repeated BankFundPosition positions = 1;
 }
+
+// ── ValidateFundAccount ───────────────────────────────────────────────────────
+
+message ValidateFundAccountRequest {
+  int64  fund_id         = 1;
+  int64  manager_id      = 2;
+  double required_amount = 3;
+}
+message ValidateFundAccountResponse {
+  int64  account_id    = 1;
+  bool   is_liquid     = 2;
+  double liquid_assets = 3;
+}
+
+// ── UpdateFundHolding ─────────────────────────────────────────────────────────
+
+message UpdateFundHoldingRequest {
+  int64  fund_id    = 1;
+  int64  listing_id = 2;
+  int64  quantity   = 3;
+  double price      = 4;
+  string direction  = 5; // BUY or SELL
+}
+message UpdateFundHoldingResponse {}

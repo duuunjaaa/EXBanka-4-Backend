@@ -23,4 +23,5 @@ type Order struct {
 	IsAON             bool
 	IsMargin          bool
 	AccountID         int64
+	FundID            int64
 }

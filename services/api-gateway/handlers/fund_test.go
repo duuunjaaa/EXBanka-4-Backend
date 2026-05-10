@@ -37,9 +37,11 @@ type stubFundClient struct {
 	getFundFn      func(context.Context, *pb.GetFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
 	updateFundFn   func(context.Context, *pb.UpdateFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
 	deleteFundFn   func(context.Context, *pb.DeleteFundRequest, ...grpc.CallOption) (*pb.DeleteFundResponse, error)
-	investFundFn       func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	withdrawFundFn     func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
-	getBankPositionsFn func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
+	investFundFn           func(context.Context, *pb.InvestFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	withdrawFundFn         func(context.Context, *pb.WithdrawFundRequest, ...grpc.CallOption) (*pb.FundResponse, error)
+	getBankPositionsFn     func(context.Context, *pb.GetBankPositionsRequest, ...grpc.CallOption) (*pb.GetBankPositionsResponse, error)
+	validateFundAccountFn  func(context.Context, *pb.ValidateFundAccountRequest, ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error)
+	updateFundHoldingFn    func(context.Context, *pb.UpdateFundHoldingRequest, ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error)
 }
 
 func (s *stubFundClient) Ping(ctx context.Context, in *pb.PingRequest, opts ...grpc.CallOption) (*pb.PingResponse, error) {
@@ -93,6 +95,18 @@ func (s *stubFundClient) WithdrawFund(ctx context.Context, in *pb.WithdrawFundRe
 func (s *stubFundClient) GetBankPositions(ctx context.Context, in *pb.GetBankPositionsRequest, opts ...grpc.CallOption) (*pb.GetBankPositionsResponse, error) {
 	if s.getBankPositionsFn != nil {
 		return s.getBankPositionsFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubFundClient) ValidateFundAccount(ctx context.Context, in *pb.ValidateFundAccountRequest, opts ...grpc.CallOption) (*pb.ValidateFundAccountResponse, error) {
+	if s.validateFundAccountFn != nil {
+		return s.validateFundAccountFn(ctx, in, opts...)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubFundClient) UpdateFundHolding(ctx context.Context, in *pb.UpdateFundHoldingRequest, opts ...grpc.CallOption) (*pb.UpdateFundHoldingResponse, error) {
+	if s.updateFundHoldingFn != nil {
+		return s.updateFundHoldingFn(ctx, in, opts...)
 	}
 	return nil, fmt.Errorf("not implemented")
 }

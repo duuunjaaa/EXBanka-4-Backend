@@ -162,6 +162,7 @@ func (s *OrderServer) CreateOrder(ctx context.Context, req *pb.CreateOrderReques
 		IsAON:             req.IsAon,
 		IsMargin:          req.IsMargin,
 		AccountID:         req.AccountId,
+		FundID:            req.FundId,
 	}
 
 	id, err := repository.InsertOrder(ctx, s.DB, o)
@@ -349,6 +350,7 @@ func orderToProto(o models.Order) *pb.Order {
 		IsAon:             o.IsAON,
 		IsMargin:          o.IsMargin,
 		AccountId:         o.AccountID,
+		FundId:            o.FundID,
 	}
 }
 

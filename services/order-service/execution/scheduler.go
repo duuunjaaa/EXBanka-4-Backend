@@ -14,6 +14,7 @@ import (
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/order-service/repository"
 	pb_emp "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
 	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
+	pb_fund "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_loan "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/loan"
 	pb_portfolio "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/portfolio"
 	pb_sec "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
@@ -31,6 +32,7 @@ type Scheduler struct {
 	EmployeeClient   pb_emp.EmployeeServiceClient
 	PortfolioClient  pb_portfolio.PortfolioServiceClient
 	ExchangeClient   pb_exchange.ExchangeServiceClient
+	FundClient       pb_fund.FundServiceClient
 
 	inProgress sync.Map // map[int64]bool — orders currently being executed
 }
@@ -203,7 +205,19 @@ func (s *Scheduler) executeOrder(order models.Order) {
 			continue
 		}
 
-		if s.PortfolioClient != nil {
+		if order.FundID != 0 && s.FundClient != nil {
+			_, err := s.FundClient.UpdateFundHolding(ctx, &pb_fund.UpdateFundHoldingRequest{
+				FundId:    order.FundID,
+				ListingId: order.AssetID,
+				Quantity:  int64(fillQty),
+				Price:     pricePerUnit,
+				Direction: order.Direction,
+			})
+			if err != nil {
+				log.Printf("order-scheduler: fund holding update error for order %d: %v", order.ID, err)
+				// Non-fatal: fill already recorded
+			}
+		} else if s.PortfolioClient != nil {
 			_, err := s.PortfolioClient.UpdateHolding(ctx, &pb_portfolio.UpdateHoldingRequest{
 				UserId:    order.UserID,
 				UserType:  order.UserType,

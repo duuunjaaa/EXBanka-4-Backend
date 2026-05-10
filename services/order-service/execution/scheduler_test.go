@@ -354,7 +354,7 @@ func TestDeclineExpiredOrders_NoPendingOrders(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "user_type", "asset_id", "order_type", "quantity", "contract_size",
 			"price_per_unit", "limit_value", "stop_value", "direction", "status", "approved_by",
-			"is_done", "last_modification", "remaining_portions", "after_hours", "is_aon", "is_margin", "account_id",
+			"is_done", "last_modification", "remaining_portions", "after_hours", "is_aon", "is_margin", "account_id", "fund_id",
 		}))
 
 	secDB, secMock, err := sqlmock.New()
@@ -378,11 +378,11 @@ func TestDeclineExpiredOrders_ExpiredFutures(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "user_type", "asset_id", "order_type", "quantity", "contract_size",
 			"price_per_unit", "limit_value", "stop_value", "direction", "status", "approved_by",
-			"is_done", "last_modification", "remaining_portions", "after_hours", "is_aon", "is_margin", "account_id",
+			"is_done", "last_modification", "remaining_portions", "after_hours", "is_aon", "is_margin", "account_id", "fund_id",
 		}).AddRow(
 			int64(7), int64(1), "EMPLOYEE", int64(10), "MARKET", int32(1), int32(1),
 			100.0, nil, nil, "BUY", "PENDING", nil,
-			false, time.Now(), int32(1), false, false, false, int64(1),
+			false, time.Now(), int32(1), false, false, false, int64(1), int64(0),
 		))
 
 	secDB, secMock, err := sqlmock.New()
@@ -399,11 +399,11 @@ func TestDeclineExpiredOrders_ExpiredFutures(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "user_type", "asset_id", "order_type", "quantity", "contract_size",
 			"price_per_unit", "limit_value", "stop_value", "direction", "status", "approved_by",
-			"is_done", "last_modification", "remaining_portions", "after_hours", "is_aon", "is_margin", "account_id",
+			"is_done", "last_modification", "remaining_portions", "after_hours", "is_aon", "is_margin", "account_id", "fund_id",
 		}).AddRow(
 			int64(7), int64(1), "EMPLOYEE", int64(10), "MARKET", int32(1), int32(1),
 			100.0, nil, nil, "BUY", "PENDING", nil,
-			false, time.Now(), int32(1), false, false, false, int64(1),
+			false, time.Now(), int32(1), false, false, false, int64(1), int64(0),
 		))
 	mock.ExpectExec(`UPDATE orders SET status`).
 		WithArgs("DECLINED", nil, sqlmock.AnyArg(), int64(7)).

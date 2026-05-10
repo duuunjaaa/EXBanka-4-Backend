@@ -20,6 +20,14 @@ CREATE TABLE IF NOT EXISTS client_fund_positions (
     UNIQUE(client_id, client_type, fund_id)
 );
 
+CREATE TABLE IF NOT EXISTS fund_portfolio_positions (
+    id         BIGSERIAL PRIMARY KEY,
+    fund_id    BIGINT        NOT NULL REFERENCES investment_funds(id),
+    listing_id BIGINT        NOT NULL,
+    quantity   NUMERIC(20,6) NOT NULL DEFAULT 0,
+    UNIQUE(fund_id, listing_id)
+);
+
 CREATE TABLE IF NOT EXISTS client_fund_transactions (
     id        BIGSERIAL PRIMARY KEY,
     client_id BIGINT        NOT NULL,

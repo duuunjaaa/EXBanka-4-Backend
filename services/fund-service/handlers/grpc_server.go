@@ -436,6 +436,71 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(err.Error(), "23505") || strings.Contains(err.Error(), "unique constraint")
 }
 
+func (s *FundServer) ValidateFundAccount(ctx context.Context, req *pb.ValidateFundAccountRequest) (*pb.ValidateFundAccountResponse, error) {
+	var accountID, managerID int64
+	var liquidAssets float64
+	err := s.DB.QueryRowContext(ctx,
+		`SELECT account_id, manager_id, liquid_assets FROM investment_funds WHERE id = $1 AND active = TRUE`,
+		req.FundId,
+	).Scan(&accountID, &managerID, &liquidAssets)
+	if err == sql.ErrNoRows {
+		return nil, status.Error(codes.NotFound, "fund not found")
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "validate fund account: %v", err)
+	}
+	if managerID != req.ManagerId {
+		return nil, status.Error(codes.PermissionDenied, "not the fund manager")
+	}
+	return &pb.ValidateFundAccountResponse{
+		AccountId:   accountID,
+		IsLiquid:    liquidAssets >= req.RequiredAmount,
+		LiquidAssets: liquidAssets,
+	}, nil
+}
+
+func (s *FundServer) UpdateFundHolding(ctx context.Context, req *pb.UpdateFundHoldingRequest) (*pb.UpdateFundHoldingResponse, error) {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "begin tx: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	tradeValue := float64(req.Quantity) * req.Price
+
+	if req.Direction == "BUY" {
+		_, err = tx.ExecContext(ctx,
+			`UPDATE investment_funds SET liquid_assets = liquid_assets - $1 WHERE id = $2`,
+			tradeValue, req.FundId)
+	} else {
+		_, err = tx.ExecContext(ctx,
+			`UPDATE investment_funds SET liquid_assets = liquid_assets + $1 WHERE id = $2`,
+			tradeValue, req.FundId)
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "update liquid_assets: %v", err)
+	}
+
+	quantityDelta := req.Quantity
+	if req.Direction == "SELL" {
+		quantityDelta = -req.Quantity
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO fund_portfolio_positions (fund_id, listing_id, quantity)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (fund_id, listing_id) DO UPDATE
+		  SET quantity = fund_portfolio_positions.quantity + EXCLUDED.quantity`,
+		req.FundId, req.ListingId, quantityDelta)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "upsert fund position: %v", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "commit: %v", err)
+	}
+	return &pb.UpdateFundHoldingResponse{}, nil
+}
+
 // GetBankPositions returns all investment fund positions held by the bank (client_type='BANK', client_id=0).
 // Used by the bank profit portal (#234).
 func (s *FundServer) GetBankPositions(ctx context.Context, _ *pb.GetBankPositionsRequest) (*pb.GetBankPositionsResponse, error) {
