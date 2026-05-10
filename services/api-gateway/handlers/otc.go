@@ -69,7 +69,7 @@ func CreateNegotiation(client pb.OtcServiceClient) gin.HandlerFunc {
 		callerType := middleware.GetCallerRoleFromToken(c)
 
 		var req struct {
-			SellerId       int64   `json:"sellerId"       binding:"required"`
+			SellerId       *int64  `json:"sellerId"       binding:"required"`
 			SellerType     string  `json:"sellerType"     binding:"required"`
 			Ticker         string  `json:"ticker"         binding:"required"`
 			Amount         int32   `json:"amount"         binding:"required"`
@@ -89,7 +89,7 @@ func CreateNegotiation(client pb.OtcServiceClient) gin.HandlerFunc {
 		resp, err := client.CreateNegotiation(ctx, &pb.CreateNegotiationRequest{
 			BuyerId:        callerID,
 			BuyerType:      callerType,
-			SellerId:       req.SellerId,
+			SellerId:       *req.SellerId,
 			SellerType:     req.SellerType,
 			Ticker:         req.Ticker,
 			Amount:         req.Amount,
