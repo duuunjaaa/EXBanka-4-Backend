@@ -31,12 +31,13 @@ CREATE TABLE IF NOT EXISTS fund_portfolio_positions (
 );
 
 CREATE TABLE IF NOT EXISTS client_fund_transactions (
-    id        BIGSERIAL PRIMARY KEY,
-    client_id BIGINT        NOT NULL,
-    client_type VARCHAR(10) NOT NULL DEFAULT 'CLIENT',
-    fund_id   BIGINT        NOT NULL REFERENCES investment_funds(id),
-    amount    DECIMAL(18,4) NOT NULL,
-    is_inflow BOOLEAN       NOT NULL,
-    status    VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
-    timestamp TIMESTAMP     NOT NULL DEFAULT NOW()
+    id                     BIGSERIAL PRIMARY KEY,
+    client_id              BIGINT        NOT NULL,
+    client_type            VARCHAR(10)   NOT NULL DEFAULT 'CLIENT',
+    fund_id                BIGINT        NOT NULL REFERENCES investment_funds(id),
+    amount                 DECIMAL(18,4) NOT NULL,
+    is_inflow              BOOLEAN       NOT NULL,
+    status                 VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
+    destination_account_id BIGINT,
+    timestamp              TIMESTAMP     NOT NULL DEFAULT NOW()
 );
