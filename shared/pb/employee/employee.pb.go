@@ -1789,6 +1789,162 @@ func (*ResetAllActuaryUsedLimitsResponse) Descriptor() ([]byte, []int) {
 	return file_employee_proto_rawDescGZIP(), []int{29}
 }
 
+type GetSupervisorsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSupervisorsRequest) Reset() {
+	*x = GetSupervisorsRequest{}
+	mi := &file_employee_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSupervisorsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSupervisorsRequest) ProtoMessage() {}
+
+func (x *GetSupervisorsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_employee_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSupervisorsRequest.ProtoReflect.Descriptor instead.
+func (*GetSupervisorsRequest) Descriptor() ([]byte, []int) {
+	return file_employee_proto_rawDescGZIP(), []int{30}
+}
+
+type SupervisorInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EmployeeId    int64                  `protobuf:"varint,1,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	FirstName     string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName      string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	Position      string                 `protobuf:"bytes,5,opt,name=position,proto3" json:"position,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SupervisorInfo) Reset() {
+	*x = SupervisorInfo{}
+	mi := &file_employee_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SupervisorInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SupervisorInfo) ProtoMessage() {}
+
+func (x *SupervisorInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_employee_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SupervisorInfo.ProtoReflect.Descriptor instead.
+func (*SupervisorInfo) Descriptor() ([]byte, []int) {
+	return file_employee_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *SupervisorInfo) GetEmployeeId() int64 {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return 0
+}
+
+func (x *SupervisorInfo) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *SupervisorInfo) GetLastName() string {
+	if x != nil {
+		return x.LastName
+	}
+	return ""
+}
+
+func (x *SupervisorInfo) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *SupervisorInfo) GetPosition() string {
+	if x != nil {
+		return x.Position
+	}
+	return ""
+}
+
+type GetSupervisorsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Supervisors   []*SupervisorInfo      `protobuf:"bytes,1,rep,name=supervisors,proto3" json:"supervisors,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSupervisorsResponse) Reset() {
+	*x = GetSupervisorsResponse{}
+	mi := &file_employee_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSupervisorsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSupervisorsResponse) ProtoMessage() {}
+
+func (x *GetSupervisorsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_employee_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSupervisorsResponse.ProtoReflect.Descriptor instead.
+func (*GetSupervisorsResponse) Descriptor() ([]byte, []int) {
+	return file_employee_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *GetSupervisorsResponse) GetSupervisors() []*SupervisorInfo {
+	if x != nil {
+		return x.Supervisors
+	}
+	return nil
+}
+
 type ActuaryPerformer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -1801,7 +1957,7 @@ type ActuaryPerformer struct {
 
 func (x *ActuaryPerformer) Reset() {
 	*x = ActuaryPerformer{}
-	mi := &file_employee_proto_msgTypes[30]
+	mi := &file_employee_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1813,7 +1969,7 @@ func (x *ActuaryPerformer) String() string {
 func (*ActuaryPerformer) ProtoMessage() {}
 
 func (x *ActuaryPerformer) ProtoReflect() protoreflect.Message {
-	mi := &file_employee_proto_msgTypes[30]
+	mi := &file_employee_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1826,7 +1982,7 @@ func (x *ActuaryPerformer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActuaryPerformer.ProtoReflect.Descriptor instead.
 func (*ActuaryPerformer) Descriptor() ([]byte, []int) {
-	return file_employee_proto_rawDescGZIP(), []int{30}
+	return file_employee_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ActuaryPerformer) GetUserId() int64 {
@@ -1865,7 +2021,7 @@ type GetActuaryPerformersRequest struct {
 
 func (x *GetActuaryPerformersRequest) Reset() {
 	*x = GetActuaryPerformersRequest{}
-	mi := &file_employee_proto_msgTypes[31]
+	mi := &file_employee_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1877,7 +2033,7 @@ func (x *GetActuaryPerformersRequest) String() string {
 func (*GetActuaryPerformersRequest) ProtoMessage() {}
 
 func (x *GetActuaryPerformersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_employee_proto_msgTypes[31]
+	mi := &file_employee_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1890,7 +2046,7 @@ func (x *GetActuaryPerformersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetActuaryPerformersRequest.ProtoReflect.Descriptor instead.
 func (*GetActuaryPerformersRequest) Descriptor() ([]byte, []int) {
-	return file_employee_proto_rawDescGZIP(), []int{31}
+	return file_employee_proto_rawDescGZIP(), []int{34}
 }
 
 type GetActuaryPerformersResponse struct {
@@ -1902,7 +2058,7 @@ type GetActuaryPerformersResponse struct {
 
 func (x *GetActuaryPerformersResponse) Reset() {
 	*x = GetActuaryPerformersResponse{}
-	mi := &file_employee_proto_msgTypes[32]
+	mi := &file_employee_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1914,7 +2070,7 @@ func (x *GetActuaryPerformersResponse) String() string {
 func (*GetActuaryPerformersResponse) ProtoMessage() {}
 
 func (x *GetActuaryPerformersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_employee_proto_msgTypes[32]
+	mi := &file_employee_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1927,7 +2083,7 @@ func (x *GetActuaryPerformersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetActuaryPerformersResponse.ProtoReflect.Descriptor instead.
 func (*GetActuaryPerformersResponse) Descriptor() ([]byte, []int) {
-	return file_employee_proto_rawDescGZIP(), []int{32}
+	return file_employee_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetActuaryPerformersResponse) GetPerformers() []*ActuaryPerformer {
@@ -2082,7 +2238,18 @@ const file_employee_proto_rawDesc = "" +
 	"\rneed_approval\x18\x02 \x01(\bR\fneedApproval\"\x19\n" +
 	"\x17SetNeedApprovalResponse\"\"\n" +
 	" ResetAllActuaryUsedLimitsRequest\"#\n" +
-	"!ResetAllActuaryUsedLimitsResponse\"\x83\x01\n" +
+	"!ResetAllActuaryUsedLimitsResponse\"\x17\n" +
+	"\x15GetSupervisorsRequest\"\x9f\x01\n" +
+	"\x0eSupervisorInfo\x12\x1f\n" +
+	"\vemployee_id\x18\x01 \x01(\x03R\n" +
+	"employeeId\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\x02 \x01(\tR\tfirstName\x12\x1b\n" +
+	"\tlast_name\x18\x03 \x01(\tR\blastName\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x1a\n" +
+	"\bposition\x18\x05 \x01(\tR\bposition\"T\n" +
+	"\x16GetSupervisorsResponse\x12:\n" +
+	"\vsupervisors\x18\x01 \x03(\v2\x18.employee.SupervisorInfoR\vsupervisors\"\x83\x01\n" +
 	"\x10ActuaryPerformer\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1d\n" +
 	"\n" +
@@ -2093,8 +2260,7 @@ const file_employee_proto_rawDesc = "" +
 	"\x1cGetActuaryPerformersResponse\x12:\n" +
 	"\n" +
 	"performers\x18\x01 \x03(\v2\x1a.employee.ActuaryPerformerR\n" +
-	"performers2\xfb\n" +
-	"\n" +
+	"performers2\xd0\v\n" +
 	"\x0fEmployeeService\x12V\n" +
 	"\x0fGetAllEmployees\x12 .employee.GetAllEmployeesRequest\x1a!.employee.GetAllEmployeesResponse\x12V\n" +
 	"\x0fSearchEmployees\x12 .employee.SearchEmployeesRequest\x1a!.employee.SearchEmployeesResponse\x12k\n" +
@@ -2110,7 +2276,8 @@ const file_employee_proto_rawDesc = "" +
 	"\x13ResetAgentUsedLimit\x12$.employee.ResetAgentUsedLimitRequest\x1a%.employee.ResetAgentUsedLimitResponse\x12V\n" +
 	"\x0fSetNeedApproval\x12 .employee.SetNeedApprovalRequest\x1a!.employee.SetNeedApprovalResponse\x12t\n" +
 	"\x19ResetAllActuaryUsedLimits\x12*.employee.ResetAllActuaryUsedLimitsRequest\x1a+.employee.ResetAllActuaryUsedLimitsResponse\x12e\n" +
-	"\x14GetActuaryPerformers\x12%.employee.GetActuaryPerformersRequest\x1a&.employee.GetActuaryPerformersResponseB=Z;github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employeeb\x06proto3"
+	"\x14GetActuaryPerformers\x12%.employee.GetActuaryPerformersRequest\x1a&.employee.GetActuaryPerformersResponse\x12S\n" +
+	"\x0eGetSupervisors\x12\x1f.employee.GetSupervisorsRequest\x1a .employee.GetSupervisorsResponseB=Z;github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employeeb\x06proto3"
 
 var (
 	file_employee_proto_rawDescOnce sync.Once
@@ -2124,7 +2291,7 @@ func file_employee_proto_rawDescGZIP() []byte {
 	return file_employee_proto_rawDescData
 }
 
-var file_employee_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_employee_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_employee_proto_goTypes = []any{
 	(*Employee)(nil),                          // 0: employee.Employee
 	(*GetAllEmployeesRequest)(nil),            // 1: employee.GetAllEmployeesRequest
@@ -2156,9 +2323,12 @@ var file_employee_proto_goTypes = []any{
 	(*SetNeedApprovalResponse)(nil),           // 27: employee.SetNeedApprovalResponse
 	(*ResetAllActuaryUsedLimitsRequest)(nil),  // 28: employee.ResetAllActuaryUsedLimitsRequest
 	(*ResetAllActuaryUsedLimitsResponse)(nil), // 29: employee.ResetAllActuaryUsedLimitsResponse
-	(*ActuaryPerformer)(nil),                  // 30: employee.ActuaryPerformer
-	(*GetActuaryPerformersRequest)(nil),       // 31: employee.GetActuaryPerformersRequest
-	(*GetActuaryPerformersResponse)(nil),      // 32: employee.GetActuaryPerformersResponse
+	(*GetSupervisorsRequest)(nil),             // 30: employee.GetSupervisorsRequest
+	(*SupervisorInfo)(nil),                    // 31: employee.SupervisorInfo
+	(*GetSupervisorsResponse)(nil),            // 32: employee.GetSupervisorsResponse
+	(*ActuaryPerformer)(nil),                  // 33: employee.ActuaryPerformer
+	(*GetActuaryPerformersRequest)(nil),       // 34: employee.GetActuaryPerformersRequest
+	(*GetActuaryPerformersResponse)(nil),      // 35: employee.GetActuaryPerformersResponse
 }
 var file_employee_proto_depIdxs = []int32{
 	0,  // 0: employee.GetAllEmployeesResponse.employees:type_name -> employee.Employee
@@ -2167,42 +2337,45 @@ var file_employee_proto_depIdxs = []int32{
 	0,  // 3: employee.GetEmployeeByIdResponse.employee:type_name -> employee.Employee
 	0,  // 4: employee.UpdateEmployeeResponse.employee:type_name -> employee.Employee
 	19, // 5: employee.GetActuariesResponse.actuaries:type_name -> employee.ActuaryInfo
-	30, // 6: employee.GetActuaryPerformersResponse.performers:type_name -> employee.ActuaryPerformer
-	1,  // 7: employee.EmployeeService.GetAllEmployees:input_type -> employee.GetAllEmployeesRequest
-	3,  // 8: employee.EmployeeService.SearchEmployees:input_type -> employee.SearchEmployeesRequest
-	5,  // 9: employee.EmployeeService.GetEmployeeCredentials:input_type -> employee.GetEmployeeCredentialsRequest
-	7,  // 10: employee.EmployeeService.CreateEmployee:input_type -> employee.CreateEmployeeRequest
-	9,  // 11: employee.EmployeeService.GetEmployeeById:input_type -> employee.GetEmployeeByIdRequest
-	11, // 12: employee.EmployeeService.UpdateEmployee:input_type -> employee.UpdateEmployeeRequest
-	13, // 13: employee.EmployeeService.ActivateEmployee:input_type -> employee.ActivateEmployeeRequest
-	15, // 14: employee.EmployeeService.GetEmployeeByEmail:input_type -> employee.GetEmployeeByEmailRequest
-	17, // 15: employee.EmployeeService.UpdatePassword:input_type -> employee.UpdatePasswordRequest
-	20, // 16: employee.EmployeeService.GetActuaries:input_type -> employee.GetActuariesRequest
-	22, // 17: employee.EmployeeService.SetAgentLimit:input_type -> employee.SetAgentLimitRequest
-	24, // 18: employee.EmployeeService.ResetAgentUsedLimit:input_type -> employee.ResetAgentUsedLimitRequest
-	26, // 19: employee.EmployeeService.SetNeedApproval:input_type -> employee.SetNeedApprovalRequest
-	28, // 20: employee.EmployeeService.ResetAllActuaryUsedLimits:input_type -> employee.ResetAllActuaryUsedLimitsRequest
-	31, // 21: employee.EmployeeService.GetActuaryPerformers:input_type -> employee.GetActuaryPerformersRequest
-	2,  // 22: employee.EmployeeService.GetAllEmployees:output_type -> employee.GetAllEmployeesResponse
-	4,  // 23: employee.EmployeeService.SearchEmployees:output_type -> employee.SearchEmployeesResponse
-	6,  // 24: employee.EmployeeService.GetEmployeeCredentials:output_type -> employee.GetEmployeeCredentialsResponse
-	8,  // 25: employee.EmployeeService.CreateEmployee:output_type -> employee.CreateEmployeeResponse
-	10, // 26: employee.EmployeeService.GetEmployeeById:output_type -> employee.GetEmployeeByIdResponse
-	12, // 27: employee.EmployeeService.UpdateEmployee:output_type -> employee.UpdateEmployeeResponse
-	14, // 28: employee.EmployeeService.ActivateEmployee:output_type -> employee.ActivateEmployeeResponse
-	16, // 29: employee.EmployeeService.GetEmployeeByEmail:output_type -> employee.GetEmployeeByEmailResponse
-	18, // 30: employee.EmployeeService.UpdatePassword:output_type -> employee.UpdatePasswordResponse
-	21, // 31: employee.EmployeeService.GetActuaries:output_type -> employee.GetActuariesResponse
-	23, // 32: employee.EmployeeService.SetAgentLimit:output_type -> employee.SetAgentLimitResponse
-	25, // 33: employee.EmployeeService.ResetAgentUsedLimit:output_type -> employee.ResetAgentUsedLimitResponse
-	27, // 34: employee.EmployeeService.SetNeedApproval:output_type -> employee.SetNeedApprovalResponse
-	29, // 35: employee.EmployeeService.ResetAllActuaryUsedLimits:output_type -> employee.ResetAllActuaryUsedLimitsResponse
-	32, // 36: employee.EmployeeService.GetActuaryPerformers:output_type -> employee.GetActuaryPerformersResponse
-	22, // [22:37] is the sub-list for method output_type
-	7,  // [7:22] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	31, // 6: employee.GetSupervisorsResponse.supervisors:type_name -> employee.SupervisorInfo
+	33, // 7: employee.GetActuaryPerformersResponse.performers:type_name -> employee.ActuaryPerformer
+	1,  // 8: employee.EmployeeService.GetAllEmployees:input_type -> employee.GetAllEmployeesRequest
+	3,  // 9: employee.EmployeeService.SearchEmployees:input_type -> employee.SearchEmployeesRequest
+	5,  // 10: employee.EmployeeService.GetEmployeeCredentials:input_type -> employee.GetEmployeeCredentialsRequest
+	7,  // 11: employee.EmployeeService.CreateEmployee:input_type -> employee.CreateEmployeeRequest
+	9,  // 12: employee.EmployeeService.GetEmployeeById:input_type -> employee.GetEmployeeByIdRequest
+	11, // 13: employee.EmployeeService.UpdateEmployee:input_type -> employee.UpdateEmployeeRequest
+	13, // 14: employee.EmployeeService.ActivateEmployee:input_type -> employee.ActivateEmployeeRequest
+	15, // 15: employee.EmployeeService.GetEmployeeByEmail:input_type -> employee.GetEmployeeByEmailRequest
+	17, // 16: employee.EmployeeService.UpdatePassword:input_type -> employee.UpdatePasswordRequest
+	20, // 17: employee.EmployeeService.GetActuaries:input_type -> employee.GetActuariesRequest
+	22, // 18: employee.EmployeeService.SetAgentLimit:input_type -> employee.SetAgentLimitRequest
+	24, // 19: employee.EmployeeService.ResetAgentUsedLimit:input_type -> employee.ResetAgentUsedLimitRequest
+	26, // 20: employee.EmployeeService.SetNeedApproval:input_type -> employee.SetNeedApprovalRequest
+	28, // 21: employee.EmployeeService.ResetAllActuaryUsedLimits:input_type -> employee.ResetAllActuaryUsedLimitsRequest
+	34, // 22: employee.EmployeeService.GetActuaryPerformers:input_type -> employee.GetActuaryPerformersRequest
+	30, // 23: employee.EmployeeService.GetSupervisors:input_type -> employee.GetSupervisorsRequest
+	2,  // 24: employee.EmployeeService.GetAllEmployees:output_type -> employee.GetAllEmployeesResponse
+	4,  // 25: employee.EmployeeService.SearchEmployees:output_type -> employee.SearchEmployeesResponse
+	6,  // 26: employee.EmployeeService.GetEmployeeCredentials:output_type -> employee.GetEmployeeCredentialsResponse
+	8,  // 27: employee.EmployeeService.CreateEmployee:output_type -> employee.CreateEmployeeResponse
+	10, // 28: employee.EmployeeService.GetEmployeeById:output_type -> employee.GetEmployeeByIdResponse
+	12, // 29: employee.EmployeeService.UpdateEmployee:output_type -> employee.UpdateEmployeeResponse
+	14, // 30: employee.EmployeeService.ActivateEmployee:output_type -> employee.ActivateEmployeeResponse
+	16, // 31: employee.EmployeeService.GetEmployeeByEmail:output_type -> employee.GetEmployeeByEmailResponse
+	18, // 32: employee.EmployeeService.UpdatePassword:output_type -> employee.UpdatePasswordResponse
+	21, // 33: employee.EmployeeService.GetActuaries:output_type -> employee.GetActuariesResponse
+	23, // 34: employee.EmployeeService.SetAgentLimit:output_type -> employee.SetAgentLimitResponse
+	25, // 35: employee.EmployeeService.ResetAgentUsedLimit:output_type -> employee.ResetAgentUsedLimitResponse
+	27, // 36: employee.EmployeeService.SetNeedApproval:output_type -> employee.SetNeedApprovalResponse
+	29, // 37: employee.EmployeeService.ResetAllActuaryUsedLimits:output_type -> employee.ResetAllActuaryUsedLimitsResponse
+	35, // 38: employee.EmployeeService.GetActuaryPerformers:output_type -> employee.GetActuaryPerformersResponse
+	32, // 39: employee.EmployeeService.GetSupervisors:output_type -> employee.GetSupervisorsResponse
+	24, // [24:40] is the sub-list for method output_type
+	8,  // [8:24] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_employee_proto_init() }
@@ -2216,7 +2389,7 @@ func file_employee_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_employee_proto_rawDesc), len(file_employee_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

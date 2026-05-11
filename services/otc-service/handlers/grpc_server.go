@@ -89,11 +89,51 @@ func (s *OtcServer) CreateNegotiation(ctx context.Context, req *pb.CreateNegotia
 	if req.PricePerStock <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "price_per_stock must be positive")
 	}
+	if req.SettlementDate == "" {
+		return nil, status.Error(codes.InvalidArgument, "settlement date is required")
+	}
+	if settlementDate, parseErr := time.Parse("2006-01-02", req.SettlementDate); parseErr != nil || !settlementDate.After(time.Now().Truncate(24*time.Hour)) {
+		return nil, status.Error(codes.InvalidArgument, "settlement date must be in the future")
+	}
+
+	// Check seller has enough free shares before creating the negotiation.
+	listingID, err := listingIDForTicker(s.SecuritiesDB, req.Ticker)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "unknown ticker: %s", req.Ticker)
+	}
+	var portfolioAmount int64
+	portfolioErr := s.PortfolioDB.QueryRowContext(ctx, `
+		SELECT COALESCE(amount, 0) FROM portfolio_entry
+		WHERE user_id = $1 AND user_type = $2 AND listing_id = $3`,
+		portfolioUserID(req.SellerId, req.SellerType), req.SellerType, listingID,
+	).Scan(&portfolioAmount)
+	if portfolioErr != nil && portfolioErr != sql.ErrNoRows {
+		return nil, status.Errorf(codes.Internal, "failed to check seller portfolio: %v", portfolioErr)
+	}
+	var activeContractsSum int64
+	_ = s.DB.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(amount), 0) FROM otc_contracts
+		WHERE ticker = $1 AND seller_id = $2 AND seller_type = $3 AND status = 'ACTIVE'`,
+		req.Ticker, req.SellerId, req.SellerType,
+	).Scan(&activeContractsSum)
+	var pendingNegotiationsSum int64
+	_ = s.DB.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(amount), 0) FROM otc_negotiations
+		WHERE ticker = $1 AND seller_id = $2 AND seller_type = $3
+		  AND status IN ('PENDING_SELLER', 'PENDING_BUYER')`,
+		req.Ticker, req.SellerId, req.SellerType,
+	).Scan(&pendingNegotiationsSum)
+	committed := activeContractsSum + pendingNegotiationsSum
+	if portfolioAmount < committed+int64(req.Amount) {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"seller does not have enough free shares (available: %d, requested: %d)",
+			portfolioAmount-committed, req.Amount)
+	}
 
 	now := time.Now()
 
 	var id int64
-	err := s.DB.QueryRowContext(ctx, `
+	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO otc_negotiations
 			(ticker, seller_id, seller_type, buyer_id, buyer_type,
 			 amount, price_per_stock, settlement_date, premium, currency,
@@ -175,6 +215,13 @@ func (s *OtcServer) CounterOffer(ctx context.Context, req *pb.CounterOfferReques
 	}
 	if currentStatus != "PENDING_SELLER" && currentStatus != "PENDING_BUYER" {
 		return nil, status.Errorf(codes.FailedPrecondition, "negotiation is in terminal state: %s", currentStatus)
+	}
+
+	if req.SettlementDate == "" {
+		return nil, status.Error(codes.InvalidArgument, "settlement date is required")
+	}
+	if settlementDate, parseErr := time.Parse("2006-01-02", req.SettlementDate); parseErr != nil || !settlementDate.After(time.Now().Truncate(24*time.Hour)) {
+		return nil, status.Error(codes.InvalidArgument, "settlement date must be in the future")
 	}
 
 	newStatus := "PENDING_BUYER"
@@ -730,22 +777,41 @@ func (s *OtcServer) GetMarket(ctx context.Context, req *pb.GetMarketRequest) (*p
 			continue
 		}
 
+		// Compute free (uncommitted) amount: subtract pending negotiations and active contracts.
+		var pendingSum int64
+		_ = s.DB.QueryRowContext(ctx, `
+			SELECT COALESCE(SUM(amount), 0) FROM otc_negotiations
+			WHERE ticker = $1 AND seller_id = $2 AND seller_type = $3
+			  AND status IN ('PENDING_SELLER', 'PENDING_BUYER')`,
+			ticker, ownerID, ownerType,
+		).Scan(&pendingSum)
+		var contractSum int64
+		_ = s.DB.QueryRowContext(ctx, `
+			SELECT COALESCE(SUM(amount), 0) FROM otc_contracts
+			WHERE ticker = $1 AND seller_id = $2 AND seller_type = $3 AND status = 'ACTIVE'`,
+			ticker, ownerID, ownerType,
+		).Scan(&contractSum)
+		freeAmount := int64(publicAmount) - pendingSum - contractSum
+		if freeAmount <= 0 {
+			continue
+		}
+
 		ownerName := "EXBanka"
 		if ownerType == "CLIENT" && ownerID != 0 {
 			ownerName = getUserName(s.EmployeeDB, s.ClientDB, ownerID, ownerType)
 		}
 
 		items = append(items, &pb.MarketItem{
-			Ticker:       ticker,
-			Name:         name,
-			Amount:       publicAmount,
+			Ticker:        ticker,
+			Name:          name,
+			Amount:        int32(freeAmount),
 			PricePerStock: price,
-			Currency:     currency,
-			LastUpdated:  lastModified.Format(time.RFC3339),
-			OwnerName:    ownerName,
-			OwnerBank:    "EXBanka",
-			OwnerId:      ownerID,
-			OwnerType:    ownerType,
+			Currency:      currency,
+			LastUpdated:   lastModified.Format(time.RFC3339),
+			OwnerName:     ownerName,
+			OwnerBank:     "EXBanka",
+			OwnerId:       ownerID,
+			OwnerType:     ownerType,
 		})
 	}
 

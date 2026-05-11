@@ -269,3 +269,35 @@ func GetActuaryPerformances(empClient pb.EmployeeServiceClient, ordClient pb_ord
 		c.JSON(http.StatusOK, result)
 	}
 }
+
+// GetSupervisors godoc
+// @Summary      List active supervisors for fund manager selection
+// @Tags         actuaries
+// @Produce      json
+// @Success      200  {array}   map[string]interface{}
+// @Security     BearerAuth
+// @Router       /api/supervisors [get]
+func GetSupervisors(client pb.EmployeeServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetSupervisors(ctx, &pb.GetSupervisorsRequest{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		result := make([]gin.H, len(resp.Supervisors))
+		for i, s := range resp.Supervisors {
+			result[i] = gin.H{
+				"employee_id": s.EmployeeId,
+				"first_name":  s.FirstName,
+				"last_name":   s.LastName,
+				"email":       s.Email,
+				"position":    s.Position,
+			}
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
