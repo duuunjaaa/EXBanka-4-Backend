@@ -124,6 +124,9 @@ message UnregisterPushTokenResponse {}
 message GetPushTokenRequest  { int64 client_id = 1; }
 message GetPushTokenResponse { string token = 1; }
 
+message LogoutRequest  { string token = 1; }
+message LogoutResponse {}
+
 service AuthService {
   rpc Login(LoginRequest)                                   returns (LoginResponse);
   rpc Refresh(RefreshRequest)                               returns (RefreshResponse);
@@ -145,4 +148,5 @@ service AuthService {
   rpc RegisterPushToken(RegisterPushTokenRequest)           returns (RegisterPushTokenResponse);
   rpc UnregisterPushToken(UnregisterPushTokenRequest)       returns (UnregisterPushTokenResponse);
   rpc GetPushToken(GetPushTokenRequest)                     returns (GetPushTokenResponse);
+  rpc Logout(LogoutRequest)                                 returns (LogoutResponse);
 }

@@ -1,14 +1,18 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -248,4 +252,114 @@ func TestGetCallerRoleFromToken_InvalidSigningMethod(t *testing.T) {
 	}
 	tokenStr, _ := jwt.NewWithClaims(jwt.SigningMethodNone, claims).SignedString(jwt.UnsafeAllowNoneSignatureType)
 	assert.Equal(t, "", runGetCallerRole("Bearer "+tokenStr))
+}
+
+// ---- JWT blacklist (token revocation) tests ----
+
+func makeTokenWithJTI(jtiVal string, expOffset time.Duration) string {
+	claims := jwt.MapClaims{
+		"jti":     jtiVal,
+		"user_id": float64(1),
+		"type":    "access",
+		"dozvole": []string{"AGENT"},
+		"exp":     time.Now().Add(expOffset).Unix(),
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(jwtSecret))
+	return tok
+}
+
+func newTestRedis(t *testing.T) *redis.Client {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	return rdb
+}
+
+// runWithRedis wires rdb into the package-level redisClient, runs f, then restores.
+func runWithRedis(t *testing.T, rdb *redis.Client, f func()) {
+	t.Helper()
+	prev := redisClient
+	InitRedis(rdb)
+	t.Cleanup(func() { redisClient = prev })
+	f()
+}
+
+func TestRequireRole_ValidToken_NotBlacklisted_Passes(t *testing.T) {
+	rdb := newTestRedis(t)
+	tok := makeTokenWithJTI("jti-clean-001", time.Hour)
+	var code int
+	runWithRedis(t, rdb, func() { code = runMiddleware("Bearer "+tok, "AGENT") })
+	assert.Equal(t, http.StatusOK, code)
+}
+
+func TestRequireRole_BlacklistedToken_Returns401(t *testing.T) {
+	rdb := newTestRedis(t)
+	jtiVal := "jti-revoked-002"
+	err := rdb.Set(context.Background(), "blacklist:"+jtiVal, "1", time.Hour).Err()
+	require.NoError(t, err)
+
+	tok := makeTokenWithJTI(jtiVal, time.Hour)
+	var code int
+	runWithRedis(t, rdb, func() { code = runMiddleware("Bearer "+tok, "AGENT") })
+	assert.Equal(t, http.StatusUnauthorized, code)
+}
+
+func TestRequireRole_BlacklistedToken_ErrorMessageIsTokenRevoked(t *testing.T) {
+	rdb := newTestRedis(t)
+	jtiVal := "jti-revoked-msg-003"
+	_ = rdb.Set(context.Background(), "blacklist:"+jtiVal, "1", time.Hour).Err()
+
+	tok := makeTokenWithJTI(jtiVal, time.Hour)
+	router := gin.New()
+	runWithRedis(t, rdb, func() {
+		router.GET("/test", RequireRole("AGENT"), func(c *gin.Context) { c.Status(http.StatusOK) })
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Contains(t, w.Body.String(), "token revoked")
+}
+
+func TestRequireRole_TokenWithoutJTI_Passes(t *testing.T) {
+	rdb := newTestRedis(t)
+	claims := jwt.MapClaims{
+		"user_id": float64(1),
+		"type":    "access",
+		"dozvole": []string{"AGENT"},
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}
+	tok, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(jwtSecret))
+	var code int
+	runWithRedis(t, rdb, func() { code = runMiddleware("Bearer "+tok, "AGENT") })
+	assert.Equal(t, http.StatusOK, code)
+}
+
+func TestRequireRole_NilRedis_SkipsBlacklistCheck(t *testing.T) {
+	prev := redisClient
+	redisClient = nil
+	defer func() { redisClient = prev }()
+
+	tok := makeTokenWithJTI("jti-no-redis-004", time.Hour)
+	assert.Equal(t, http.StatusOK, runMiddleware("Bearer "+tok, "AGENT"))
+}
+
+func TestRequireRole_ExpiredBlacklistEntry_Passes(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+
+	jtiVal := "jti-expired-005"
+	_ = rdb.Set(context.Background(), "blacklist:"+jtiVal, "1", time.Second).Err()
+
+	// Fast-forward miniredis so the key has expired.
+	mr.FastForward(2 * time.Second)
+
+	tok := makeTokenWithJTI(jtiVal, time.Hour)
+	var code int
+	runWithRedis(t, rdb, func() { code = runMiddleware("Bearer "+tok, "AGENT") })
+	assert.Equal(t, http.StatusOK, code)
 }

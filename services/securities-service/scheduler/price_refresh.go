@@ -1,16 +1,19 @@
 package scheduler
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/securities-service/seeder"
+	"github.com/redis/go-redis/v9"
 )
 
 // StartPriceRefresh launches a background goroutine that refreshes listing prices
 // every interval using AlphaVantage. The first tick fires after one full interval.
-func StartPriceRefresh(db *sql.DB, avKey string, interval time.Duration) {
+func StartPriceRefresh(db *sql.DB, avKey string, interval time.Duration, rdb *redis.Client) {
 	if avKey == "" {
 		log.Println("price_refresh: ALPHAVANTAGE_API_KEY not set, price refresh disabled")
 		return
@@ -19,19 +22,26 @@ func StartPriceRefresh(db *sql.DB, avKey string, interval time.Duration) {
 	go func() {
 		for range ticker.C {
 			log.Println("price_refresh: running")
-			refreshPrices(db, avKey)
+			refreshPrices(db, avKey, rdb)
 			log.Println("price_refresh: done")
 		}
 	}()
 	log.Printf("price_refresh: scheduled every %s", interval)
 }
 
-func refreshPrices(db *sql.DB, avKey string) {
-	refreshStocks(db, avKey)
-	refreshForex(db, avKey)
+func invalidateListing(rdb *redis.Client, id int64) {
+	if rdb == nil {
+		return
+	}
+	_ = rdb.Del(context.Background(), fmt.Sprintf("listing:%d", id)).Err()
 }
 
-func refreshStocks(db *sql.DB, avKey string) {
+func refreshPrices(db *sql.DB, avKey string, rdb *redis.Client) {
+	refreshStocks(db, avKey, rdb)
+	refreshForex(db, avKey, rdb)
+}
+
+func refreshStocks(db *sql.DB, avKey string, rdb *redis.Client) {
 	rows, err := db.Query(`SELECT id, ticker FROM listing WHERE type = 'STOCK'`)
 	if err != nil {
 		log.Printf("price_refresh: query stocks: %v", err)
@@ -70,11 +80,13 @@ func refreshStocks(db *sql.DB, avKey string) {
 			s.id, q.Price, q.Ask, q.Bid, q.Change, q.Volume, time.Now())
 		if err != nil {
 			log.Printf("price_refresh: update stock %s: %v", s.ticker, err)
+			continue
 		}
+		invalidateListing(rdb, s.id)
 	}
 }
 
-func refreshForex(db *sql.DB, avKey string) {
+func refreshForex(db *sql.DB, avKey string, rdb *redis.Client) {
 	rows, err := db.Query(`
 		SELECT l.id, fp.base_currency, fp.quote_currency
 		FROM listing l
@@ -118,6 +130,8 @@ func refreshForex(db *sql.DB, avKey string) {
 			p.id, rate.Price, rate.Ask, rate.Bid, time.Now())
 		if err != nil {
 			log.Printf("price_refresh: update forex %s/%s: %v", p.from, p.to, err)
+			continue
 		}
+		invalidateListing(rdb, p.id)
 	}
 }

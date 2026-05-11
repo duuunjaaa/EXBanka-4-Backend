@@ -14,6 +14,7 @@ import (
 	pb_client "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/client"
 	pb_email "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/email"
 	pb_emp "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/employee"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -52,12 +53,17 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
+	})
+
 	s := grpc.NewServer()
 	pb_auth.RegisterAuthServiceServer(s, &handlers.AuthServer{
 		DB:             database,
 		EmployeeClient: employeeClient,
 		EmailClient:    emailClient,
 		ClientClient:   clientClient,
+		Redis:          redisClient,
 	})
 
 	log.Println("auth-service listening on :50052")

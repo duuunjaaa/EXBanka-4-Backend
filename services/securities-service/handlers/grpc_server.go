@@ -8,13 +8,56 @@ import (
 
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
 	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
+
+const listingCacheTTL = 15 * time.Minute
 
 type SecuritiesServer struct {
 	pb.UnimplementedSecuritiesServiceServer
-	DB *sql.DB
+	DB    *sql.DB
+	Redis *redis.Client
+}
+
+func listingCacheKey(id int64) string {
+	return fmt.Sprintf("listing:%d", id)
+}
+
+func (s *SecuritiesServer) loadCachedListing(ctx context.Context, id int64) *pb.GetListingByIdResponse {
+	if s.Redis == nil {
+		return nil
+	}
+	data, err := s.Redis.Get(ctx, listingCacheKey(id)).Bytes()
+	if err != nil {
+		return nil
+	}
+	var resp pb.GetListingByIdResponse
+	if err := protojson.Unmarshal(data, &resp); err != nil {
+		return nil
+	}
+	return &resp
+}
+
+func (s *SecuritiesServer) storeCachedListing(ctx context.Context, id int64, resp *pb.GetListingByIdResponse) {
+	if s.Redis == nil {
+		return
+	}
+	data, err := protojson.Marshal(resp)
+	if err != nil {
+		return
+	}
+	_ = s.Redis.Set(ctx, listingCacheKey(id), data, listingCacheTTL).Err()
+}
+
+// InvalidateListing deletes the cached listing from Redis. Called by the price refresh scheduler.
+func (s *SecuritiesServer) InvalidateListing(ctx context.Context, id int64) {
+	if s.Redis == nil {
+		return
+	}
+	_ = s.Redis.Del(ctx, listingCacheKey(id)).Err()
 }
 
 // ── Ping ──────────────────────────────────────────────────────────────────────
@@ -547,6 +590,10 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 }
 
 func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListingByIdRequest) (*pb.GetListingByIdResponse, error) {
+	if cached := s.loadCachedListing(ctx, req.Id); cached != nil {
+		return cached, nil
+	}
+
 	var (
 		id                           int64
 		ticker, name, lType, acronym string
@@ -701,6 +748,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		}
 	}
 
+	s.storeCachedListing(ctx, req.Id, resp)
 	return resp, nil
 }
 

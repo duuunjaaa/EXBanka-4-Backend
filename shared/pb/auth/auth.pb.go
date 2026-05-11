@@ -1825,6 +1825,86 @@ func (x *GetPushTokenResponse) GetToken() string {
 	return ""
 }
 
+type LogoutRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutRequest) Reset() {
+	*x = LogoutRequest{}
+	mi := &file_auth_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutRequest) ProtoMessage() {}
+
+func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
+func (*LogoutRequest) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *LogoutRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type LogoutResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutResponse) Reset() {
+	*x = LogoutResponse{}
+	mi := &file_auth_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutResponse) ProtoMessage() {}
+
+func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutResponse.ProtoReflect.Descriptor instead.
+func (*LogoutResponse) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{38}
+}
+
 var File_auth_proto protoreflect.FileDescriptor
 
 const file_auth_proto_rawDesc = "" +
@@ -1932,7 +2012,10 @@ const file_auth_proto_rawDesc = "" +
 	"\x13GetPushTokenRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\x03R\bclientId\",\n" +
 	"\x14GetPushTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token2\xaa\v\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"%\n" +
+	"\rLogoutRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x10\n" +
+	"\x0eLogoutResponse2\xdf\v\n" +
 	"\vAuthService\x120\n" +
 	"\x05Login\x12\x12.auth.LoginRequest\x1a\x13.auth.LoginResponse\x126\n" +
 	"\aRefresh\x12\x14.auth.RefreshRequest\x1a\x15.auth.RefreshResponse\x12`\n" +
@@ -1951,7 +2034,8 @@ const file_auth_proto_rawDesc = "" +
 	"\x14UpdateApprovalStatus\x12!.auth.UpdateApprovalStatusRequest\x1a\".auth.UpdateApprovalStatusResponse\x12T\n" +
 	"\x11RegisterPushToken\x12\x1e.auth.RegisterPushTokenRequest\x1a\x1f.auth.RegisterPushTokenResponse\x12Z\n" +
 	"\x13UnregisterPushToken\x12 .auth.UnregisterPushTokenRequest\x1a!.auth.UnregisterPushTokenResponse\x12E\n" +
-	"\fGetPushToken\x12\x19.auth.GetPushTokenRequest\x1a\x1a.auth.GetPushTokenResponseB9Z7github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/authb\x06proto3"
+	"\fGetPushToken\x12\x19.auth.GetPushTokenRequest\x1a\x1a.auth.GetPushTokenResponse\x123\n" +
+	"\x06Logout\x12\x13.auth.LogoutRequest\x1a\x14.auth.LogoutResponseB9Z7github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/authb\x06proto3"
 
 var (
 	file_auth_proto_rawDescOnce sync.Once
@@ -1965,7 +2049,7 @@ func file_auth_proto_rawDescGZIP() []byte {
 	return file_auth_proto_rawDescData
 }
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_auth_proto_goTypes = []any{
 	(*LoginRequest)(nil),                        // 0: auth.LoginRequest
 	(*LoginResponse)(nil),                       // 1: auth.LoginResponse
@@ -2004,6 +2088,8 @@ var file_auth_proto_goTypes = []any{
 	(*UnregisterPushTokenResponse)(nil),         // 34: auth.UnregisterPushTokenResponse
 	(*GetPushTokenRequest)(nil),                 // 35: auth.GetPushTokenRequest
 	(*GetPushTokenResponse)(nil),                // 36: auth.GetPushTokenResponse
+	(*LogoutRequest)(nil),                       // 37: auth.LogoutRequest
+	(*LogoutResponse)(nil),                      // 38: auth.LogoutResponse
 }
 var file_auth_proto_depIdxs = []int32{
 	22, // 0: auth.CreateApprovalResponse.approval:type_name -> auth.Approval
@@ -2028,26 +2114,28 @@ var file_auth_proto_depIdxs = []int32{
 	31, // 19: auth.AuthService.RegisterPushToken:input_type -> auth.RegisterPushTokenRequest
 	33, // 20: auth.AuthService.UnregisterPushToken:input_type -> auth.UnregisterPushTokenRequest
 	35, // 21: auth.AuthService.GetPushToken:input_type -> auth.GetPushTokenRequest
-	1,  // 22: auth.AuthService.Login:output_type -> auth.LoginResponse
-	3,  // 23: auth.AuthService.Refresh:output_type -> auth.RefreshResponse
-	5,  // 24: auth.AuthService.CreateActivationToken:output_type -> auth.CreateActivationTokenResponse
-	7,  // 25: auth.AuthService.ActivateAccount:output_type -> auth.ActivateAccountResponse
-	9,  // 26: auth.AuthService.RequestPasswordReset:output_type -> auth.RequestPasswordResetResponse
-	11, // 27: auth.AuthService.ResetPassword:output_type -> auth.ResetPasswordResponse
-	13, // 28: auth.AuthService.ClientLogin:output_type -> auth.ClientLoginResponse
-	17, // 29: auth.AuthService.ClientRefresh:output_type -> auth.ClientRefreshResponse
-	19, // 30: auth.AuthService.CreateClientActivationToken:output_type -> auth.CreateClientActivationTokenResponse
-	21, // 31: auth.AuthService.ActivateClient:output_type -> auth.ActivateClientResponse
-	15, // 32: auth.AuthService.PollApproval:output_type -> auth.PollApprovalResponse
-	24, // 33: auth.AuthService.CreateApproval:output_type -> auth.CreateApprovalResponse
-	26, // 34: auth.AuthService.GetApproval:output_type -> auth.GetApprovalResponse
-	28, // 35: auth.AuthService.GetClientApprovals:output_type -> auth.GetClientApprovalsResponse
-	30, // 36: auth.AuthService.UpdateApprovalStatus:output_type -> auth.UpdateApprovalStatusResponse
-	32, // 37: auth.AuthService.RegisterPushToken:output_type -> auth.RegisterPushTokenResponse
-	34, // 38: auth.AuthService.UnregisterPushToken:output_type -> auth.UnregisterPushTokenResponse
-	36, // 39: auth.AuthService.GetPushToken:output_type -> auth.GetPushTokenResponse
-	22, // [22:40] is the sub-list for method output_type
-	4,  // [4:22] is the sub-list for method input_type
+	37, // 22: auth.AuthService.Logout:input_type -> auth.LogoutRequest
+	1,  // 23: auth.AuthService.Login:output_type -> auth.LoginResponse
+	3,  // 24: auth.AuthService.Refresh:output_type -> auth.RefreshResponse
+	5,  // 25: auth.AuthService.CreateActivationToken:output_type -> auth.CreateActivationTokenResponse
+	7,  // 26: auth.AuthService.ActivateAccount:output_type -> auth.ActivateAccountResponse
+	9,  // 27: auth.AuthService.RequestPasswordReset:output_type -> auth.RequestPasswordResetResponse
+	11, // 28: auth.AuthService.ResetPassword:output_type -> auth.ResetPasswordResponse
+	13, // 29: auth.AuthService.ClientLogin:output_type -> auth.ClientLoginResponse
+	17, // 30: auth.AuthService.ClientRefresh:output_type -> auth.ClientRefreshResponse
+	19, // 31: auth.AuthService.CreateClientActivationToken:output_type -> auth.CreateClientActivationTokenResponse
+	21, // 32: auth.AuthService.ActivateClient:output_type -> auth.ActivateClientResponse
+	15, // 33: auth.AuthService.PollApproval:output_type -> auth.PollApprovalResponse
+	24, // 34: auth.AuthService.CreateApproval:output_type -> auth.CreateApprovalResponse
+	26, // 35: auth.AuthService.GetApproval:output_type -> auth.GetApprovalResponse
+	28, // 36: auth.AuthService.GetClientApprovals:output_type -> auth.GetClientApprovalsResponse
+	30, // 37: auth.AuthService.UpdateApprovalStatus:output_type -> auth.UpdateApprovalStatusResponse
+	32, // 38: auth.AuthService.RegisterPushToken:output_type -> auth.RegisterPushTokenResponse
+	34, // 39: auth.AuthService.UnregisterPushToken:output_type -> auth.UnregisterPushTokenResponse
+	36, // 40: auth.AuthService.GetPushToken:output_type -> auth.GetPushTokenResponse
+	38, // 41: auth.AuthService.Logout:output_type -> auth.LogoutResponse
+	23, // [23:42] is the sub-list for method output_type
+	4,  // [4:23] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name
 	4,  // [4:4] is the sub-list for extension extendee
 	0,  // [0:4] is the sub-list for field type_name
@@ -2064,7 +2152,7 @@ func file_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   37,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
