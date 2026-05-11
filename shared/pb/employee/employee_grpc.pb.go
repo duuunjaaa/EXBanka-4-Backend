@@ -34,6 +34,7 @@ const (
 	EmployeeService_SetNeedApproval_FullMethodName           = "/employee.EmployeeService/SetNeedApproval"
 	EmployeeService_ResetAllActuaryUsedLimits_FullMethodName = "/employee.EmployeeService/ResetAllActuaryUsedLimits"
 	EmployeeService_GetActuaryPerformers_FullMethodName      = "/employee.EmployeeService/GetActuaryPerformers"
+	EmployeeService_GetSupervisors_FullMethodName            = "/employee.EmployeeService/GetSupervisors"
 )
 
 // EmployeeServiceClient is the client API for EmployeeService service.
@@ -55,6 +56,7 @@ type EmployeeServiceClient interface {
 	SetNeedApproval(ctx context.Context, in *SetNeedApprovalRequest, opts ...grpc.CallOption) (*SetNeedApprovalResponse, error)
 	ResetAllActuaryUsedLimits(ctx context.Context, in *ResetAllActuaryUsedLimitsRequest, opts ...grpc.CallOption) (*ResetAllActuaryUsedLimitsResponse, error)
 	GetActuaryPerformers(ctx context.Context, in *GetActuaryPerformersRequest, opts ...grpc.CallOption) (*GetActuaryPerformersResponse, error)
+	GetSupervisors(ctx context.Context, in *GetSupervisorsRequest, opts ...grpc.CallOption) (*GetSupervisorsResponse, error)
 }
 
 type employeeServiceClient struct {
@@ -215,6 +217,16 @@ func (c *employeeServiceClient) GetActuaryPerformers(ctx context.Context, in *Ge
 	return out, nil
 }
 
+func (c *employeeServiceClient) GetSupervisors(ctx context.Context, in *GetSupervisorsRequest, opts ...grpc.CallOption) (*GetSupervisorsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSupervisorsResponse)
+	err := c.cc.Invoke(ctx, EmployeeService_GetSupervisors_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EmployeeServiceServer is the server API for EmployeeService service.
 // All implementations must embed UnimplementedEmployeeServiceServer
 // for forward compatibility.
@@ -234,6 +246,7 @@ type EmployeeServiceServer interface {
 	SetNeedApproval(context.Context, *SetNeedApprovalRequest) (*SetNeedApprovalResponse, error)
 	ResetAllActuaryUsedLimits(context.Context, *ResetAllActuaryUsedLimitsRequest) (*ResetAllActuaryUsedLimitsResponse, error)
 	GetActuaryPerformers(context.Context, *GetActuaryPerformersRequest) (*GetActuaryPerformersResponse, error)
+	GetSupervisors(context.Context, *GetSupervisorsRequest) (*GetSupervisorsResponse, error)
 	mustEmbedUnimplementedEmployeeServiceServer()
 }
 
@@ -288,6 +301,9 @@ func (UnimplementedEmployeeServiceServer) ResetAllActuaryUsedLimits(context.Cont
 }
 func (UnimplementedEmployeeServiceServer) GetActuaryPerformers(context.Context, *GetActuaryPerformersRequest) (*GetActuaryPerformersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetActuaryPerformers not implemented")
+}
+func (UnimplementedEmployeeServiceServer) GetSupervisors(context.Context, *GetSupervisorsRequest) (*GetSupervisorsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSupervisors not implemented")
 }
 func (UnimplementedEmployeeServiceServer) mustEmbedUnimplementedEmployeeServiceServer() {}
 func (UnimplementedEmployeeServiceServer) testEmbeddedByValue()                         {}
@@ -580,6 +596,24 @@ func _EmployeeService_GetActuaryPerformers_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EmployeeService_GetSupervisors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSupervisorsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmployeeServiceServer).GetSupervisors(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmployeeService_GetSupervisors_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmployeeServiceServer).GetSupervisors(ctx, req.(*GetSupervisorsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EmployeeService_ServiceDesc is the grpc.ServiceDesc for EmployeeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -646,6 +680,10 @@ var EmployeeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetActuaryPerformers",
 			Handler:    _EmployeeService_GetActuaryPerformers_Handler,
+		},
+		{
+			MethodName: "GetSupervisors",
+			Handler:    _EmployeeService_GetSupervisors_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
