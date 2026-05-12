@@ -118,6 +118,15 @@ func TestGetUserName_ZeroID(t *testing.T) {
 	assert.Equal(t, "", name)
 }
 
+func TestGetUserName_DBError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	mock.ExpectQuery("SELECT first_name").WillReturnError(fmt.Errorf("db error"))
+	name := getUserName(nil, db, 42, "CLIENT")
+	assert.Equal(t, "", name)
+}
+
 // ===== CreateNegotiation =====
 
 func TestCreateNegotiation_Happy(t *testing.T) {
@@ -850,6 +859,914 @@ func TestGetMarket_CurrencyFromJoin(t *testing.T) {
 	assert.Equal(t, "USD", resp.Items[0].Currency)
 	assert.Equal(t, "AAPL", resp.Items[0].Ticker)
 	assert.Equal(t, "John Doe", resp.Items[0].OwnerName)
+	assert.NoError(t, mPort.ExpectationsWereMet())
+	assert.NoError(t, mSec.ExpectationsWereMet())
+}
+
+func TestGetMarket_DBError(t *testing.T) {
+	s, _, _, _, _, mPort, _ := newTestServer(t)
+	mPort.ExpectQuery("SELECT .* FROM portfolio_entry").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.GetMarket(context.Background(), &pb.GetMarketRequest{
+		CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestGetMarket_ScanError(t *testing.T) {
+	s, _, _, _, _, mPort, _ := newTestServer(t)
+	mPort.ExpectQuery("SELECT .* FROM portfolio_entry").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"user_id", "user_type", "listing_id", "public_amount", "last_modified",
+		}).AddRow("bad", "CLIENT", int64(42), int32(10), time.Now()))
+	_, err := s.GetMarket(context.Background(), &pb.GetMarketRequest{
+		CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== calcContractProfit =====
+
+func TestCalcContractProfit_Exercised(t *testing.T) {
+	s, _, _, _, _, _, mSec := newTestServer(t)
+	mSec.ExpectQuery("SELECT price FROM listing WHERE ticker").
+		WillReturnRows(sqlmock.NewRows([]string{"price"}).AddRow(float64(200.0)))
+	profit := s.calcContractProfit("AAPL", 100.0, 5, 50.0, "EXERCISED")
+	// (200-100)*5 - 50 = 450
+	assert.Equal(t, float64(450.0), profit)
+	assert.NoError(t, mSec.ExpectationsWereMet())
+}
+
+func TestCalcContractProfit_DBError(t *testing.T) {
+	s, _, _, _, _, _, mSec := newTestServer(t)
+	mSec.ExpectQuery("SELECT price FROM listing WHERE ticker").
+		WillReturnError(fmt.Errorf("db error"))
+	profit := s.calcContractProfit("AAPL", 100.0, 5, 0.0, "ACTIVE")
+	assert.Equal(t, float64(0), profit)
+}
+
+// ===== ListContracts scan error =====
+
+func TestListContracts_ScanError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "negotiation_id", "seller_id", "seller_type", "buyer_id", "buyer_type",
+			"ticker", "amount", "strike_price", "premium", "currency",
+			"settlement_date", "status", "created_at",
+		}).AddRow(
+			"bad", int64(1), int64(10), "CLIENT", int64(20), "CLIENT",
+			"AAPL", int32(5), float64(100.0), float64(10.0), "USD",
+			"2026-12-31", "ACTIVE", time.Now(),
+		))
+	_, err := s.ListContracts(context.Background(), &pb.ListContractsRequest{
+		CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== ListNegotiations scan error =====
+
+func TestListNegotiations_ScanError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT id FROM otc_negotiations").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("bad"))
+	_, err := s.ListNegotiations(context.Background(), &pb.ListNegotiationsRequest{
+		CallerId: 5, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== CounterOffer additional paths =====
+
+func TestCounterOffer_InternalError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id, seller_type, buyer_id, buyer_type, status").
+		WillReturnError(fmt.Errorf("connection reset"))
+	_, err := s.CounterOffer(context.Background(), &pb.CounterOfferRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "EMPLOYEE",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestCounterOffer_UpdateFails(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id, seller_type, buyer_id, buyer_type, status").
+		WillReturnRows(sqlmock.NewRows([]string{"seller_id", "seller_type", "buyer_id", "buyer_type", "status"}).
+			AddRow(int64(10), "EMPLOYEE", int64(20), "CLIENT", "PENDING_SELLER"))
+	mainMock.ExpectExec("UPDATE otc_negotiations").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.CounterOffer(context.Background(), &pb.CounterOfferRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "EMPLOYEE",
+		Amount: 90, PricePerStock: 155.0, SettlementDate: "2026-06-15",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== RejectNegotiation additional paths =====
+
+func TestRejectNegotiation_InternalError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id, seller_type, buyer_id, buyer_type, status").
+		WillReturnError(fmt.Errorf("connection reset"))
+	_, err := s.RejectNegotiation(context.Background(), &pb.RejectNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "EMPLOYEE",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestRejectNegotiation_UpdateFails(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id, seller_type, buyer_id, buyer_type, status").
+		WillReturnRows(sqlmock.NewRows([]string{"seller_id", "seller_type", "buyer_id", "buyer_type", "status"}).
+			AddRow(int64(10), "EMPLOYEE", int64(20), "CLIENT", "PENDING_SELLER"))
+	mainMock.ExpectExec("UPDATE otc_negotiations").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.RejectNegotiation(context.Background(), &pb.RejectNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "EMPLOYEE",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== AcceptNegotiation additional paths =====
+
+func TestAcceptNegotiation_InternalError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnError(fmt.Errorf("connection reset"))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestAcceptNegotiation_WrongTurn_Buyer(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	// PENDING_BUYER but the seller tries to accept
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_BUYER", "AAPL", "USD", 5, 10))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "waiting for buyer")
+}
+
+func TestAcceptNegotiation_ListingIDNotFound(t *testing.T) {
+	s, mainMock, _, _, _, _, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	// Return 0 rows → ErrNoRows → listingIDForTicker returns fmt.Errorf
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "ticker")
+}
+
+func TestAcceptNegotiation_PortfolioInternalError(t *testing.T) {
+	s, mainMock, _, _, _, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "seller portfolio")
+}
+
+func TestAcceptNegotiation_UnsupportedCurrency(t *testing.T) {
+	s, mainMock, _, _, _, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "XYZ", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "unsupported currency")
+}
+
+func TestAcceptNegotiation_FindBuyerAccountFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	// findAccount buyer returns 0 rows → ErrNoRows
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT", BuyerAccountId: 0,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "buyer account")
+}
+
+func TestAcceptNegotiation_BuyerBalanceQueryFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "buyer balance")
+}
+
+func TestAcceptNegotiation_FindSellerAccountFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	// findAccount buyer
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)))
+	// findAccount seller returns 0 rows
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "seller account")
+}
+
+func TestAcceptNegotiation_DeductBuyerPremiumFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	// deduct buyer premium fails
+	mAcc.ExpectExec("UPDATE accounts SET balance").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "deduct premium")
+}
+
+func TestAcceptNegotiation_CreditSellerFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance").
+		WillReturnResult(sqlmock.NewResult(0, 1)) // deduct buyer succeeds
+	mAcc.ExpectExec("UPDATE accounts SET balance").
+		WillReturnError(fmt.Errorf("db error")) // credit seller fails
+	// compensation: restore buyer
+	mAcc.ExpectExec("UPDATE accounts SET balance").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "credit premium")
+}
+
+func TestAcceptNegotiation_ReloadNegotiationFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	// reload negotiation details fails
+	mainMock.ExpectQuery("SELECT settlement_date").
+		WillReturnError(fmt.Errorf("db error"))
+	// compensation: restore buyer and seller
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "reload negotiation")
+}
+
+func TestAcceptNegotiation_InsertContractFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectQuery("SELECT settlement_date").
+		WillReturnRows(sqlmock.NewRows([]string{"settlement_date", "price_per_stock"}).
+			AddRow("2026-12-31", float64(100.0)))
+	mainMock.ExpectQuery("INSERT INTO otc_contracts").
+		WillReturnError(fmt.Errorf("db error"))
+	// compensation
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "create contract")
+}
+
+func TestAcceptNegotiation_UpdateNegotiationFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	mainMock.ExpectQuery("SELECT seller_id").
+		WillReturnRows(acceptNegRow(10, 20, "CLIENT", "CLIENT", "PENDING_SELLER", "AAPL", "USD", 5, 10))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectQuery("SELECT COALESCE.*SUM").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(100)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(500)))
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectQuery("SELECT settlement_date").
+		WillReturnRows(sqlmock.NewRows([]string{"settlement_date", "price_per_stock"}).
+			AddRow("2026-12-31", float64(100.0)))
+	mainMock.ExpectQuery("INSERT INTO otc_contracts").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mainMock.ExpectExec("UPDATE otc_negotiations").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.AcceptNegotiation(context.Background(), &pb.AcceptNegotiationRequest{
+		NegotiationId: 1, CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "accept negotiation")
+}
+
+// ===== ExerciseContract additional paths =====
+
+func TestExerciseContract_InternalError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnError(fmt.Errorf("connection reset"))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestExerciseContract_SettlementDatePassed(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	// settlement date is 2 days in the past (beyond 24h grace)
+	past := time.Now().Add(-48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, past))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "settlement date")
+}
+
+func TestExerciseContract_UnsupportedCurrency(t *testing.T) {
+	s, mainMock, _, _, _, _, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"seller_id", "seller_type", "buyer_id", "buyer_type", "status",
+			"ticker", "amount", "strike_price", "currency", "settlement_date",
+		}).AddRow(int64(10), "CLIENT", int64(20), "CLIENT", "ACTIVE",
+			"AAPL", int32(5), float64(100.0), "XYZ", future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "unsupported currency")
+}
+
+func TestExerciseContract_ListingIDNotFound(t *testing.T) {
+	s, mainMock, _, _, _, _, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	// Return 0 rows → ErrNoRows → listingIDForTicker error
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "ticker")
+}
+
+func TestExerciseContract_FindBuyerAccountFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, _, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// findAccount buyer returns 0 rows
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 0,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "buyer account")
+}
+
+func TestExerciseContract_Step1UpdateFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, _, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnError(fmt.Errorf("db error"))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log"). // step 1 FAILED
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 1")
+}
+
+func TestExerciseContract_Step2InternalError(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1 succeeds
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2: internal error (not ErrNoRows)
+	mPort.ExpectQuery("SELECT COALESCE").WillReturnError(fmt.Errorf("db error"))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 2 FAILED
+	// comp1: restore buyer available_balance
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 1 COMPENSATED
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 2")
+}
+
+func TestExerciseContract_Step3SellerAccountNotFound(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3: findAccount seller returns 0 rows
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 3 FAILED
+	// comp2: sagaLog only
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 2 COMPENSATED
+	// comp1
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 1 COMPENSATED
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 3")
+	assert.NoError(t, mainMock.ExpectationsWereMet())
+}
+
+func TestExerciseContract_Step3DebitBuyerFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3: findAccount seller ok, debit buyer fails
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance - ").
+		WillReturnError(fmt.Errorf("db error"))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 3 FAILED
+	// comp2 + comp1
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 3")
+}
+
+func TestExerciseContract_Step3CreditSellerFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3: findAccount seller ok, debit buyer ok, credit seller fails
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").
+		WillReturnError(fmt.Errorf("db error"))
+	// inner restore buyer balance
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 3 FAILED
+	// comp2 + comp1
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 3")
+}
+
+func TestExerciseContract_Step4SellerUpdateFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance - ").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 4: seller portfolio UPDATE fails
+	mPort.ExpectExec(`(?s)UPDATE portfolio_entry.*public_amount = GREATEST`).
+		WillReturnError(fmt.Errorf("db error"))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 4 FAILED
+	// comp3: retryExec buyer restore + seller restore
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance -").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp2
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp1
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 4")
+}
+
+func TestExerciseContract_Step4BuyerUpsertFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance - ").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 4: seller UPDATE ok, DELETE ok, buyer upsert fails
+	mPort.ExpectExec(`(?s)UPDATE portfolio_entry.*public_amount = GREATEST`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mPort.ExpectExec("DELETE FROM portfolio_entry").WillReturnResult(sqlmock.NewResult(0, 0))
+	mPort.ExpectExec("INSERT INTO portfolio_entry").WillReturnError(fmt.Errorf("db error"))
+	// inner comp: restore seller portfolio
+	mPort.ExpectExec("UPDATE portfolio_entry SET amount = amount \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 4 COMPENSATED
+	// comp3
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance -").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp2
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp1
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 4")
+}
+
+func TestExerciseContract_Step5UpdateContractFails(t *testing.T) {
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(contractRow(10, 20, future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance - ").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 4
+	mPort.ExpectExec(`(?s)UPDATE portfolio_entry.*public_amount = GREATEST`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mPort.ExpectExec("DELETE FROM portfolio_entry").WillReturnResult(sqlmock.NewResult(0, 0))
+	mPort.ExpectExec("INSERT INTO portfolio_entry").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 5: UPDATE fails
+	mainMock.ExpectExec("UPDATE otc_contracts SET status").
+		WillReturnError(fmt.Errorf("db error"))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1)) // step 5 FAILED
+	// comp4: seller restore + buyer reduce
+	mPort.ExpectExec("UPDATE portfolio_entry SET amount = amount \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mPort.ExpectExec("UPDATE portfolio_entry SET amount = amount -").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp3
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance -").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp2
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// comp1
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance \\+").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	_, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "step 5")
+}
+
+func TestExerciseContract_EmployeeSeller(t *testing.T) {
+	// EMPLOYEE seller → portfolioUserID returns 0 (bank shared portfolio)
+	s, mainMock, _, _, mAcc, mPort, mSec := newTestServer(t)
+	future := time.Now().Add(48 * time.Hour)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"seller_id", "seller_type", "buyer_id", "buyer_type", "status",
+			"ticker", "amount", "strike_price", "currency", "settlement_date",
+		}).AddRow(int64(5), "EMPLOYEE", int64(20), "CLIENT", "ACTIVE",
+			"AAPL", int32(5), float64(100.0), "USD", future))
+	mSec.ExpectQuery("SELECT id FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+	// Step 1
+	mAcc.ExpectQuery("SELECT available_balance FROM accounts WHERE id").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(10000)))
+	mAcc.ExpectExec("UPDATE accounts SET available_balance = available_balance - ").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 2: portfolioUserID(5, "EMPLOYEE") = 0
+	mPort.ExpectQuery("SELECT COALESCE").
+		WillReturnRows(sqlmock.NewRows([]string{"amount"}).AddRow(int64(100)))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 3: findAccount seller (portfolioUserID=0)
+	mAcc.ExpectQuery("SELECT id FROM accounts WHERE owner_id").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(200)))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance - ").WillReturnResult(sqlmock.NewResult(0, 1))
+	mAcc.ExpectExec("UPDATE accounts SET balance = balance \\+").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 4
+	mPort.ExpectExec(`(?s)UPDATE portfolio_entry.*public_amount = GREATEST`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mPort.ExpectExec("DELETE FROM portfolio_entry").WillReturnResult(sqlmock.NewResult(0, 0))
+	mPort.ExpectExec("INSERT INTO portfolio_entry").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+	// Step 5
+	mainMock.ExpectExec("UPDATE otc_contracts SET status").WillReturnResult(sqlmock.NewResult(0, 1))
+	mainMock.ExpectExec("INSERT INTO otc_saga_log").WillReturnResult(sqlmock.NewResult(1, 1))
+
+	resp, err := s.ExerciseContract(context.Background(), &pb.ExerciseContractRequest{
+		ContractId: 1, CallerId: 20, CallerType: "CLIENT", BuyerAccountId: 100,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "EXERCISED", resp.Status)
+}
+
+// ===== fetchNegotiationByID internal error =====
+
+func TestGetNegotiation_InternalError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT id, ticker").
+		WillReturnError(fmt.Errorf("connection reset"))
+	_, err := s.GetNegotiation(context.Background(), &pb.GetNegotiationRequest{NegotiationId: 1})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== ListNegotiations fetchNegotiationByID error in loop =====
+
+func TestListNegotiations_FetchError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT id FROM otc_negotiations").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	// fetchNegotiationByID returns internal error (non-ErrNoRows)
+	mainMock.ExpectQuery("SELECT id, ticker").
+		WillReturnError(fmt.Errorf("connection reset"))
+	_, err := s.ListNegotiations(context.Background(), &pb.ListNegotiationsRequest{
+		CallerId: 5, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== CounterOffer: PENDING_SELLER but buyer tries =====
+
+func TestCounterOffer_BuyerTriesWhenPendingSeller(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	// status=PENDING_SELLER but the buyer makes counter offer
+	mainMock.ExpectQuery("SELECT seller_id, seller_type, buyer_id, buyer_type, status").
+		WillReturnRows(sqlmock.NewRows([]string{"seller_id", "seller_type", "buyer_id", "buyer_type", "status"}).
+			AddRow(int64(10), "EMPLOYEE", int64(20), "CLIENT", "PENDING_SELLER"))
+	_, err := s.CounterOffer(context.Background(), &pb.CounterOfferRequest{
+		NegotiationId: 1, CallerId: 20, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+	assert.Contains(t, status.Convert(err).Message(), "waiting for seller")
+}
+
+// ===== ListContracts QueryContext error =====
+
+func TestListContracts_QueryError(t *testing.T) {
+	s, mainMock, _, _, _, _, _ := newTestServer(t)
+	mainMock.ExpectQuery("SELECT .* FROM otc_contracts").
+		WillReturnError(fmt.Errorf("db error"))
+	_, err := s.ListContracts(context.Background(), &pb.ListContractsRequest{
+		CallerId: 10, CallerType: "CLIENT",
+	})
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// ===== GetMarket: securities query fails for a row — continue =====
+
+func TestGetMarket_SecQueryFails(t *testing.T) {
+	s, _, _, _, _, mPort, mSec := newTestServer(t)
+	mPort.ExpectQuery("SELECT .* FROM portfolio_entry").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"user_id", "user_type", "listing_id", "public_amount", "last_modified",
+		}).AddRow(int64(99), "CLIENT", int64(42), int32(10), time.Now()))
+	// securities query fails → continue (item skipped)
+	mSec.ExpectQuery("SELECT l.ticker, l.name, l.price, se.currency").
+		WillReturnError(fmt.Errorf("db error"))
+	resp, err := s.GetMarket(context.Background(), &pb.GetMarketRequest{
+		CallerId: 10, CallerType: "CLIENT",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Items) // item was skipped
 	assert.NoError(t, mPort.ExpectationsWereMet())
 	assert.NoError(t, mSec.ExpectationsWereMet())
 }

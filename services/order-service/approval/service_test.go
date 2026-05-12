@@ -3,6 +3,7 @@ package approval
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -137,6 +138,22 @@ func TestApproveOrder_Happy_EmployeeActuary_Sell(t *testing.T) {
 }
 
 // ── DeclineOrder ─────────────────────────────────────────────────────────────
+
+func TestApproveOrder_EmployeeActuary_DeductError(t *testing.T) {
+	// DeductActuaryUsedLimit fails → non-fatal (line 35-38 in service.go).
+	orderDB, orderMock, empDB, empMock := newMocks(t)
+	rows := sqlmock.NewRows(orderCols)
+	addOrderRow(rows, 1, 20, "EMPLOYEE", "PENDING", 2, 150.0, 5)
+	orderMock.ExpectQuery("SELECT id").WillReturnRows(rows)
+	orderMock.ExpectExec("UPDATE orders SET status").WillReturnResult(sqlmock.NewResult(1, 1))
+	empMock.ExpectQuery("SELECT EXISTS").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	empMock.ExpectExec("UPDATE actuary_info SET used_limit").WillReturnError(fmt.Errorf("db error"))
+
+	err := ApproveOrder(context.Background(), orderDB, empDB, 1, 5)
+	require.NoError(t, err)
+	require.NoError(t, orderMock.ExpectationsWereMet())
+	require.NoError(t, empMock.ExpectationsWereMet())
+}
 
 func TestDeclineOrder_NotFound(t *testing.T) {
 	orderDB, orderMock, _, _ := newMocks(t)

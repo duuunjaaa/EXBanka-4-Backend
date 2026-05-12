@@ -1073,3 +1073,215 @@ func TestGetActuaryProfits_DBError(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }
+
+func TestGetActuaryProfits_ScanError(t *testing.T) {
+	srv, dbMock, _, _ := newOrderServerWithExchangeDB(t)
+
+	// Return a row with bad type for user_id to trigger scan error.
+	dbMock.ExpectQuery(`SELECT o\.user_id, o\.asset_id`).WillReturnRows(
+		sqlmock.NewRows([]string{"user_id", "asset_id", "net_pnl"}).
+			AddRow("bad", int64(5), float64(100)),
+	)
+
+	_, err := srv.GetActuaryProfits(context.Background(), &pb.GetActuaryProfitsRequest{})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestGetActuaryProfits_DuplicateCurrencyCached(t *testing.T) {
+	// Two assets with USD → rate fetched once, second is served from cache (line 421-422 covered).
+	srv, dbMock, secMock, exchMock := newOrderServerWithExchangeDB(t)
+
+	dbMock.ExpectQuery(`SELECT o\.user_id, o\.asset_id`).WillReturnRows(
+		sqlmock.NewRows([]string{"user_id", "asset_id", "net_pnl"}).
+			AddRow(int64(1), int64(5), float64(100)).
+			AddRow(int64(1), int64(6), float64(200)),
+	)
+	// Both assets map to USD
+	secMock.ExpectQuery(`SELECT e\.currency FROM listing`).
+		WithArgs(int64(5)).
+		WillReturnRows(sqlmock.NewRows([]string{"currency"}).AddRow("USD"))
+	secMock.ExpectQuery(`SELECT e\.currency FROM listing`).
+		WithArgs(int64(6)).
+		WillReturnRows(sqlmock.NewRows([]string{"currency"}).AddRow("USD"))
+	// Rate fetched once (first USD), second is cached
+	exchMock.ExpectQuery(`SELECT selling_rate FROM daily_exchange_rates`).
+		WillReturnRows(sqlmock.NewRows([]string{"selling_rate"}).AddRow(float64(118.0)))
+
+	resp, err := srv.GetActuaryProfits(context.Background(), &pb.GetActuaryProfitsRequest{})
+	require.NoError(t, err)
+	require.Len(t, resp.Profits, 1)
+}
+
+func TestCreateOrder_FuturesListing(t *testing.T) {
+	srv, dbMock, _, secMock, accMock := newOrderServerWithSecDB(t)
+	srv.SecuritiesClient = &mockSecClient{
+		getListingById: func(_ context.Context, _ *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+			return &pb_sec.GetListingByIdResponse{
+				Summary: &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, ExchangeAcronym: "NYSE"},
+				Detail:  &pb_sec.GetListingByIdResponse_Futures{Futures: &pb_sec.FuturesDetail{ContractSize: 50}},
+			}, nil
+		},
+	}
+	accMock.ExpectQuery("SELECT available_balance FROM accounts").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(999999)))
+	secMock.ExpectQuery("SELECT mic_code FROM stock_exchanges").WillReturnError(sql.ErrNoRows)
+	dbMock.ExpectQuery("INSERT INTO orders").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(30)))
+
+	resp, err := srv.CreateOrder(context.Background(), &pb.CreateOrderRequest{
+		UserId: 1, UserType: "CLIENT", AssetId: 5, Quantity: 2, AccountId: 42, Direction: "BUY",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(30), resp.OrderId)
+	// contractSize=50, pricePerUnit=100, quantity=2 → approxPrice=10000
+	assert.InDelta(t, 10000.0, resp.ApproximatePrice, 1.0)
+}
+
+func TestCreateOrder_ClientBuy_BalanceQueryError(t *testing.T) {
+	srv, _, _, secMock, accMock := newOrderServerWithSecDB(t)
+	srv.SecuritiesClient = &mockSecClient{
+		getListingById: func(_ context.Context, _ *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+			return &pb_sec.GetListingByIdResponse{
+				Summary: &pb_sec.ListingSummary{Ask: 150.0, Bid: 148.0, ExchangeAcronym: "NYSE"},
+			}, nil
+		},
+	}
+	secMock.ExpectQuery("SELECT mic_code FROM stock_exchanges").WillReturnError(sql.ErrNoRows)
+	accMock.ExpectQuery("SELECT available_balance FROM accounts").WillReturnError(fmt.Errorf("db error"))
+
+	_, err := srv.CreateOrder(context.Background(), &pb.CreateOrderRequest{
+		UserId: 1, UserType: "CLIENT", AssetId: 5, Quantity: 10, AccountId: 42, Direction: "BUY",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+func TestCreateOrder_ClientBuy_InsufficientFunds(t *testing.T) {
+	srv, _, _, secMock, accMock := newOrderServerWithSecDB(t)
+	srv.SecuritiesClient = &mockSecClient{
+		getListingById: func(_ context.Context, _ *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+			return &pb_sec.GetListingByIdResponse{
+				Summary: &pb_sec.ListingSummary{Ask: 150.0, Bid: 148.0, ExchangeAcronym: "NYSE"},
+			}, nil
+		},
+	}
+	secMock.ExpectQuery("SELECT mic_code FROM stock_exchanges").WillReturnError(sql.ErrNoRows)
+	// Balance much lower than approxPrice (150 * 10 = 1500)
+	accMock.ExpectQuery("SELECT available_balance FROM accounts").
+		WillReturnRows(sqlmock.NewRows([]string{"available_balance"}).AddRow(float64(1)))
+
+	_, err := srv.CreateOrder(context.Background(), &pb.CreateOrderRequest{
+		UserId: 1, UserType: "CLIENT", AssetId: 5, Quantity: 10, AccountId: 42, Direction: "BUY",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "insufficient funds")
+}
+
+func TestCreateOrder_Sell_PortfolioError(t *testing.T) {
+	srv, _, _, secMock, _ := newOrderServerWithSecDB(t)
+	srv.SecuritiesClient = &mockSecClient{
+		getListingById: func(_ context.Context, _ *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+			return &pb_sec.GetListingByIdResponse{
+				Summary: &pb_sec.ListingSummary{Ask: 150.0, Bid: 148.0, ExchangeAcronym: "NYSE"},
+			}, nil
+		},
+	}
+	srv.PortfolioClient = &mockPortfolioClient{
+		getPortfolio: func(_ context.Context, _ *pb_portfolio.GetPortfolioRequest, _ ...grpc.CallOption) (*pb_portfolio.GetPortfolioResponse, error) {
+			return nil, fmt.Errorf("portfolio service down")
+		},
+	}
+	secMock.ExpectQuery("SELECT mic_code FROM stock_exchanges").WillReturnError(sql.ErrNoRows)
+
+	_, err := srv.CreateOrder(context.Background(), &pb.CreateOrderRequest{
+		UserId: 1, UserType: "CLIENT", AssetId: 5, Quantity: 10, AccountId: 42, Direction: "SELL",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Contains(t, err.Error(), "failed to fetch portfolio")
+}
+
+func TestCreateOrder_Employee_CurrencyConversion(t *testing.T) {
+	// EMPLOYEE order, non-RSD listing currency → approxPriceRSD = approxPrice * rate.
+	db, dbMock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	empDB, empMock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer empDB.Close()
+	secDB, secMock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer secDB.Close()
+	exchDB, exchMock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer exchDB.Close()
+
+	srv := &handlers.OrderServer{
+		DB: db, EmployeeDB: empDB, SecuritiesDB: secDB, ExchangeDB: exchDB,
+		PortfolioClient: &mockPortfolioClient{},
+		SecuritiesClient: &mockSecClient{
+			getListingById: func(_ context.Context, _ *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+				return &pb_sec.GetListingByIdResponse{
+					Summary: &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, ExchangeAcronym: "NYSE"},
+				}, nil
+			},
+		},
+	}
+
+	// After-hours check
+	secMock.ExpectQuery("SELECT mic_code FROM stock_exchanges").WillReturnError(sql.ErrNoRows)
+	// EMPLOYEE: listing currency = USD (non-RSD)
+	secMock.ExpectQuery("SELECT e.currency FROM listing").
+		WillReturnRows(sqlmock.NewRows([]string{"currency"}).AddRow("USD"))
+	// Exchange rate = 118
+	exchMock.ExpectQuery("SELECT selling_rate FROM daily_exchange_rates").
+		WillReturnRows(sqlmock.NewRows([]string{"selling_rate"}).AddRow(float64(118.0)))
+	// Actuary info: needApproval=false, will auto-approve
+	empMock.ExpectQuery("SELECT limit_amount, used_limit, need_approval").
+		WillReturnRows(sqlmock.NewRows([]string{"limit_amount", "used_limit", "need_approval"}).
+			AddRow(float64(1000000), float64(0), false))
+	// Insert order
+	dbMock.ExpectQuery("INSERT INTO orders").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(50)))
+	// DeductActuaryUsedLimit (auto-approved EMPLOYEE BUY)
+	empMock.ExpectExec("UPDATE actuary_info SET used_limit").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	resp, err := srv.CreateOrder(context.Background(), &pb.CreateOrderRequest{
+		UserId: 20, UserType: "EMPLOYEE", AssetId: 5, Quantity: 1, AccountId: 42, Direction: "BUY",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(50), resp.OrderId)
+	assert.Equal(t, "APPROVED", resp.Status)
+}
+
+func TestCreateOrder_Actuary_AutoApproved_Buy_DeductError(t *testing.T) {
+	srv, dbMock, empMock, secMock, _ := newOrderServerWithSecDB(t)
+	srv.SecuritiesClient = &mockSecClient{
+		getListingById: func(_ context.Context, _ *pb_sec.GetListingByIdRequest, _ ...grpc.CallOption) (*pb_sec.GetListingByIdResponse, error) {
+			return &pb_sec.GetListingByIdResponse{
+				Summary: &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, ExchangeAcronym: "NYSE"},
+			}, nil
+		},
+	}
+	secMock.ExpectQuery("SELECT mic_code FROM stock_exchanges").WillReturnError(sql.ErrNoRows)
+	// Actuary info: no approval needed, lots of limit → auto-approve
+	empMock.ExpectQuery("SELECT limit_amount, used_limit, need_approval").
+		WillReturnRows(sqlmock.NewRows([]string{"limit_amount", "used_limit", "need_approval"}).
+			AddRow(float64(1000000), float64(0), false))
+	dbMock.ExpectQuery("INSERT INTO orders").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(51)))
+	// DeductActuaryUsedLimit returns error (non-fatal)
+	empMock.ExpectExec("UPDATE actuary_info SET used_limit").
+		WillReturnError(fmt.Errorf("db error"))
+
+	resp, err := srv.CreateOrder(context.Background(), &pb.CreateOrderRequest{
+		UserId: 20, UserType: "EMPLOYEE", AssetId: 5, Quantity: 1, AccountId: 42, Direction: "BUY",
+	})
+	// Error is non-fatal, order still succeeds
+	require.NoError(t, err)
+	assert.Equal(t, int64(51), resp.OrderId)
+	assert.Equal(t, "APPROVED", resp.Status)
+}

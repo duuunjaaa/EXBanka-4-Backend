@@ -220,3 +220,53 @@ func TestSetNeedApproval_SetFalse(t *testing.T) {
 	w := serveHandler(SetNeedApproval(client), "PUT", "/api/actuaries/:id/need-approval", "/api/actuaries/1/need-approval", `{"need_approval":false}`)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
+
+func TestResetAgentUsedLimit_GrpcError(t *testing.T) {
+	client := &stubEmpClient{
+		resetUsedLimitFn: func(_ context.Context, _ *pb.ResetAgentUsedLimitRequest, _ ...grpc.CallOption) (*pb.ResetAgentUsedLimitResponse, error) {
+			return nil, status.Error(codes.Internal, "db error")
+		},
+	}
+	w := serveHandler(ResetAgentUsedLimit(client), "POST", "/api/actuaries/:id/reset-used-limit", "/api/actuaries/5/reset-used-limit", "")
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestSetNeedApproval_GrpcError(t *testing.T) {
+	client := &stubEmpClient{
+		setNeedApprovalFn: func(_ context.Context, _ *pb.SetNeedApprovalRequest, _ ...grpc.CallOption) (*pb.SetNeedApprovalResponse, error) {
+			return nil, status.Error(codes.Internal, "db error")
+		},
+	}
+	w := serveHandler(SetNeedApproval(client), "PUT", "/api/actuaries/:id/need-approval", "/api/actuaries/1/need-approval", `{"need_approval":true}`)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestSetAgentLimit_GrpcError(t *testing.T) {
+	client := &stubEmpClient{
+		setAgentLimitFn: func(_ context.Context, _ *pb.SetAgentLimitRequest, _ ...grpc.CallOption) (*pb.SetAgentLimitResponse, error) {
+			return nil, status.Error(codes.Internal, "db error")
+		},
+	}
+	w := serveHandler(SetAgentLimit(client), "PUT", "/api/actuaries/:id/limit", "/api/actuaries/1/limit", `{"limit":1000}`)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestResetAgentUsedLimit_InvalidArgument(t *testing.T) {
+	client := &stubEmpClient{
+		resetUsedLimitFn: func(_ context.Context, _ *pb.ResetAgentUsedLimitRequest, _ ...grpc.CallOption) (*pb.ResetAgentUsedLimitResponse, error) {
+			return nil, status.Error(codes.InvalidArgument, "employee is not an agent")
+		},
+	}
+	w := serveHandler(ResetAgentUsedLimit(client), "POST", "/api/actuaries/:id/reset-used-limit", "/api/actuaries/1/reset-used-limit", "")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestSetNeedApproval_InvalidArgument(t *testing.T) {
+	client := &stubEmpClient{
+		setNeedApprovalFn: func(_ context.Context, _ *pb.SetNeedApprovalRequest, _ ...grpc.CallOption) (*pb.SetNeedApprovalResponse, error) {
+			return nil, status.Error(codes.InvalidArgument, "employee is not an agent")
+		},
+	}
+	w := serveHandler(SetNeedApproval(client), "PUT", "/api/actuaries/:id/need-approval", "/api/actuaries/1/need-approval", `{"need_approval":true}`)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}

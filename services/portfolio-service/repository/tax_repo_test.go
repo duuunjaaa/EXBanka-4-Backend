@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -143,4 +144,56 @@ func TestGetTaxDebtList_IncludesPaidUsers(t *testing.T) {
 	require.Len(t, debts, 1)
 	assert.InDelta(t, 0.0, debts[0].DebtRSD, 0.001)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestGetTaxDebtList_QueryError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT user_id, user_type`).
+		WillReturnError(sql.ErrConnDone)
+
+	_, err = GetTaxDebtList(context.Background(), db, "")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+}
+
+func TestGetTaxDebtList_ScanError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT user_id, user_type`).
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "user_type", "debt_rsd"}).
+			AddRow("bad", "CLIENT", 100.0))
+
+	_, err = GetTaxDebtList(context.Background(), db, "")
+	assert.Error(t, err)
+}
+
+// queryTaxRecords is covered via GetUnpaidRecords and GetUnpaidRecordsForUser.
+
+func TestGetUnpaidRecords_QueryError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT id, user_id`).
+		WillReturnError(sql.ErrConnDone)
+
+	_, err = GetUnpaidRecords(context.Background(), db)
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+}
+
+func TestGetUnpaidRecords_ScanError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT id, user_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}).
+			AddRow("bad", int64(1), "CLIENT", 10.0, 1, 2026, false, (*time.Time)(nil)))
+
+	_, err = GetUnpaidRecords(context.Background(), db)
+	assert.Error(t, err)
 }

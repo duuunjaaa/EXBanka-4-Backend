@@ -45,6 +45,8 @@ func mapOtcError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": status.Convert(err).Message()})
 	case codes.AlreadyExists:
 		c.JSON(http.StatusConflict, gin.H{"error": status.Convert(err).Message()})
+	case codes.FailedPrecondition:
+		c.JSON(http.StatusConflict, gin.H{"error": status.Convert(err).Message()})
 	case codes.InvalidArgument:
 		c.JSON(http.StatusBadRequest, gin.H{"error": status.Convert(err).Message()})
 	default:
