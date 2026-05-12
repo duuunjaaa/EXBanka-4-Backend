@@ -139,6 +139,7 @@ func main() {
 	r.PUT("/api/actuaries/:id/limit", middleware.RequireRole("SUPERVISOR"), handlers.SetAgentLimit(employeeClient))
 	r.POST("/api/actuaries/:id/reset-used-limit", middleware.RequireRole("SUPERVISOR"), handlers.ResetAgentUsedLimit(employeeClient))
 	r.PUT("/api/actuaries/:id/need-approval", middleware.RequireRole("SUPERVISOR"), handlers.SetNeedApproval(employeeClient))
+	r.GET("/api/supervisors", middleware.RequireRole("SUPERVISOR", "ADMIN"), handlers.GetSupervisors(employeeClient))
 	// Bank profit portal (#226, #234)
 	r.GET("/bank/profit/actuaries", middleware.RequireRole("SUPERVISOR"), handlers.GetActuaryPerformances(employeeClient, orderClient))
 	r.GET("/bank/profit/fund-positions", middleware.RequireRole("SUPERVISOR"), handlers.GetBankFundPositions(fundClient))

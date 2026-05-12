@@ -34,6 +34,22 @@ func (s *FundServer) CreateFund(ctx context.Context, req *pb.CreateFundRequest) 
 		return nil, status.Error(codes.InvalidArgument, "manager_id is required")
 	}
 
+	// Validate that the manager is an active supervisor
+	var permStr string
+	err := s.EmployeeDB.QueryRowContext(ctx,
+		`SELECT array_to_string(permissions, ',') FROM employees WHERE id = $1 AND active = true`,
+		req.ManagerId,
+	).Scan(&permStr)
+	if err == sql.ErrNoRows {
+		return nil, status.Error(codes.InvalidArgument, "manager not found or inactive")
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to verify manager: %v", err)
+	}
+	if !strings.Contains(strings.ToUpper(permStr), "SUPERVISOR") {
+		return nil, status.Error(codes.PermissionDenied, "fund manager must be a supervisor")
+	}
+
 	// Create a bank account for this fund
 	accountResp, err := s.AccountClient.CreateAccount(ctx, &pb_account.CreateAccountRequest{
 		ClientId:       0,
