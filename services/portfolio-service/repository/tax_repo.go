@@ -81,7 +81,7 @@ func GetTaxDebtList(ctx context.Context, db *sql.DB, userTypeFilter string) ([]T
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var debts []TaxDebt
 	for rows.Next() {
@@ -99,7 +99,7 @@ func queryTaxRecords(ctx context.Context, db *sql.DB, query string, args ...inte
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var records []TaxRecord
 	for rows.Next() {
