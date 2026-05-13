@@ -258,7 +258,7 @@ func main() {
 	r.GET("/client/funds/positions", middleware.RequireRole("CLIENT"), handlers.GetMyPositions(fundClient))
 	r.POST("/investment/funds/:id/securities/buy", middleware.RequireRole("SUPERVISOR"), handlers.BuyFundSecurities(fundClient, securitiesClient, orderClient))
 	r.POST("/investment/funds/:id/securities/sell", middleware.RequireRole("SUPERVISOR"), handlers.SellFundSecurities(fundClient, securitiesClient, orderClient))
-	r.GET("/investment/funds/:id/securities", middleware.RequireRole("SUPERVISOR"), handlers.GetFundSecurities(fundClient, securitiesClient))
+	r.GET("/investment/funds/:id/securities", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFundSecurities(fundClient, securitiesClient))
 	r.GET("/investment/funds/:id/performance", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFundPerformanceHistory(fundClient))
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

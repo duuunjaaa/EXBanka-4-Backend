@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
+	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	"google.golang.org/grpc/codes"
@@ -15,11 +16,13 @@ import (
 
 type FundServer struct {
 	pb.UnimplementedFundServiceServer
-	DB            *sql.DB // fund_db
-	AccountDB     *sql.DB // account_db
-	EmployeeDB    *sql.DB // employee_db
-	AccountClient pb_account.AccountServiceClient
-	OrderClient   pb_order.OrderServiceClient
+	DB             *sql.DB // fund_db
+	AccountDB      *sql.DB // account_db
+	EmployeeDB     *sql.DB // employee_db
+	ExchangeDB     *sql.DB // exchange_db (currency code lookup)
+	AccountClient  pb_account.AccountServiceClient
+	OrderClient    pb_order.OrderServiceClient
+	ExchangeClient pb_exchange.ExchangeServiceClient
 }
 
 func (s *FundServer) Ping(_ context.Context, _ *pb.PingRequest) (*pb.PingResponse, error) {
@@ -46,8 +49,9 @@ func (s *FundServer) CreateFund(ctx context.Context, req *pb.CreateFundRequest) 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify manager: %v", err)
 	}
-	if !strings.Contains(strings.ToUpper(permStr), "SUPERVISOR") {
-		return nil, status.Error(codes.PermissionDenied, "fund manager must be a supervisor")
+	upper := strings.ToUpper(permStr)
+	if !strings.Contains(upper, "SUPERVISOR") && !strings.Contains(upper, "ADMIN") {
+		return nil, status.Error(codes.PermissionDenied, "fund manager must be a supervisor or admin")
 	}
 
 	// Create a bank account for this fund
@@ -242,9 +246,10 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 
 	var minimumContribution float64
 	var active bool
+	var fundAccountID int64
 	err := s.DB.QueryRowContext(ctx,
-		`SELECT minimum_contribution, active FROM investment_funds WHERE id = $1`, req.FundId,
-	).Scan(&minimumContribution, &active)
+		`SELECT minimum_contribution, active, account_id FROM investment_funds WHERE id = $1`, req.FundId,
+	).Scan(&minimumContribution, &active, &fundAccountID)
 	if err == sql.ErrNoRows {
 		return nil, status.Error(codes.NotFound, "fund not found")
 	} else if err != nil {
@@ -266,16 +271,31 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 	} else if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fetch account: %v", err)
 	}
-	if availableBalance < req.Amount {
+	srcCurrency := s.getAccountCurrencyCode(ctx, req.SourceAccountId)
+	debitAmount := s.convertViaExchange(ctx, "RSD", srcCurrency, req.Amount)
+
+	if availableBalance < debitAmount {
 		return nil, status.Error(codes.FailedPrecondition, "insufficient account balance")
 	}
 
 	_, err = s.AccountDB.ExecContext(ctx,
 		`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-		req.Amount, req.SourceAccountId,
+		debitAmount, req.SourceAccountId,
 	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to debit account: %v", err)
+	}
+
+	_, err = s.AccountDB.ExecContext(ctx,
+		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+		req.Amount, fundAccountID,
+	)
+	if err != nil {
+		_, _ = s.AccountDB.ExecContext(ctx,
+			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+			debitAmount, req.SourceAccountId,
+		)
+		return nil, status.Errorf(codes.Internal, "failed to credit fund account: %v", err)
 	}
 
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -283,7 +303,7 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 		// compensate
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			req.Amount, req.SourceAccountId,
+			debitAmount, req.SourceAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
@@ -296,7 +316,7 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 		_ = tx.Rollback()
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			req.Amount, req.SourceAccountId,
+			debitAmount, req.SourceAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to update fund liquid assets: %v", err)
 	}
@@ -313,7 +333,7 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 		_ = tx.Rollback()
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			req.Amount, req.SourceAccountId,
+			debitAmount, req.SourceAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to upsert position: %v", err)
 	}
@@ -326,7 +346,7 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 		_ = tx.Rollback()
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			req.Amount, req.SourceAccountId,
+			debitAmount, req.SourceAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to insert transaction: %v", err)
 	}
@@ -334,7 +354,7 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 	if err = tx.Commit(); err != nil {
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			req.Amount, req.SourceAccountId,
+			debitAmount, req.SourceAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to commit: %v", err)
 	}
@@ -345,9 +365,10 @@ func (s *FundServer) InvestFund(ctx context.Context, req *pb.InvestFundRequest) 
 func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundRequest) (*pb.WithdrawFundResponse, error) {
 	var liquidAssets float64
 	var active bool
+	var fundAccountID int64
 	err := s.DB.QueryRowContext(ctx,
-		`SELECT liquid_assets, active FROM investment_funds WHERE id = $1`, req.FundId,
-	).Scan(&liquidAssets, &active)
+		`SELECT liquid_assets, active, account_id FROM investment_funds WHERE id = $1`, req.FundId,
+	).Scan(&liquidAssets, &active, &fundAccountID)
 	if err == sql.ErrNoRows {
 		return nil, status.Error(codes.NotFound, "fund not found")
 	} else if err != nil {
@@ -389,11 +410,26 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 	}
 
 	// Case 1: sufficient liquidity — immediate settlement
+	destCurrency := s.getAccountCurrencyCode(ctx, req.DestinationAccountId)
+	creditAmount := s.convertViaExchange(ctx, "RSD", destCurrency, amount)
+
 	_, err = s.AccountDB.ExecContext(ctx,
-		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-		amount, req.DestinationAccountId,
+		`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
+		amount, fundAccountID,
 	)
 	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to debit fund account: %v", err)
+	}
+
+	_, err = s.AccountDB.ExecContext(ctx,
+		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+		creditAmount, req.DestinationAccountId,
+	)
+	if err != nil {
+		_, _ = s.AccountDB.ExecContext(ctx,
+			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+			amount, fundAccountID,
+		)
 		return nil, status.Errorf(codes.Internal, "failed to credit account: %v", err)
 	}
 
@@ -401,7 +437,11 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 	if err != nil {
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			amount, req.DestinationAccountId,
+			creditAmount, req.DestinationAccountId,
+		)
+		_, _ = s.AccountDB.ExecContext(ctx,
+			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+			amount, fundAccountID,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
 	}
@@ -414,7 +454,7 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 		_ = tx.Rollback()
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			amount, req.DestinationAccountId,
+			creditAmount, req.DestinationAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to update fund liquid assets: %v", err)
 	}
@@ -427,7 +467,7 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 		_ = tx.Rollback()
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			amount, req.DestinationAccountId,
+			creditAmount, req.DestinationAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to update position: %v", err)
 	}
@@ -440,7 +480,7 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 		_ = tx.Rollback()
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			amount, req.DestinationAccountId,
+			creditAmount, req.DestinationAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to insert transaction: %v", err)
 	}
@@ -448,7 +488,7 @@ func (s *FundServer) WithdrawFund(ctx context.Context, req *pb.WithdrawFundReque
 	if err = tx.Commit(); err != nil {
 		_, _ = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			amount, req.DestinationAccountId,
+			creditAmount, req.DestinationAccountId,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to commit: %v", err)
 	}
@@ -549,9 +589,12 @@ func (s *FundServer) CheckPendingWithdrawals(ctx context.Context, req *pb.CheckP
 			continue
 		}
 
+		destCurrency := s.getAccountCurrencyCode(ctx, destAccID)
+		creditAmount := s.convertViaExchange(ctx, "RSD", destCurrency, txAmount)
+
 		_, err = s.AccountDB.ExecContext(ctx,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			txAmount, destAccID)
+			creditAmount, destAccID)
 		if err != nil {
 			continue
 		}
@@ -561,7 +604,7 @@ func (s *FundServer) CheckPendingWithdrawals(ctx context.Context, req *pb.CheckP
 			// Undo account credit
 			_, _ = s.AccountDB.ExecContext(ctx,
 				`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-				txAmount, destAccID)
+				creditAmount, destAccID)
 			continue
 		}
 		_, _ = tx.ExecContext(ctx,
@@ -591,6 +634,44 @@ func (s *FundServer) CheckPendingWithdrawals(ctx context.Context, req *pb.CheckP
 // isUniqueViolation checks if the error is a PostgreSQL unique constraint violation (error code 23505).
 func isUniqueViolation(err error) bool {
 	return strings.Contains(err.Error(), "23505") || strings.Contains(err.Error(), "unique constraint")
+}
+
+// getAccountCurrencyCode returns the ISO currency code for the given account (e.g. "RSD", "USD").
+// Falls back to "RSD" on any error so callers never need to handle a missing currency.
+func (s *FundServer) getAccountCurrencyCode(ctx context.Context, accountID int64) string {
+	var currencyID int64
+	if err := s.AccountDB.QueryRowContext(ctx,
+		`SELECT currency_id FROM accounts WHERE id = $1`, accountID,
+	).Scan(&currencyID); err != nil {
+		return "RSD"
+	}
+	if s.ExchangeDB == nil {
+		return "RSD"
+	}
+	var code string
+	if err := s.ExchangeDB.QueryRowContext(ctx,
+		`SELECT code FROM currencies WHERE id = $1`, currencyID,
+	).Scan(&code); err != nil {
+		return "RSD"
+	}
+	return code
+}
+
+// convertViaExchange converts amount from fromCurrency to toCurrency using published exchange rates (no commission).
+// Returns amount unchanged if currencies are equal or the exchange client is unavailable.
+func (s *FundServer) convertViaExchange(ctx context.Context, fromCurrency, toCurrency string, amount float64) float64 {
+	if s.ExchangeClient == nil || fromCurrency == toCurrency {
+		return amount
+	}
+	resp, err := s.ExchangeClient.PreviewConversion(ctx, &pb_exchange.PreviewConversionRequest{
+		FromCurrency: fromCurrency,
+		ToCurrency:   toCurrency,
+		Amount:       amount,
+	})
+	if err != nil {
+		return amount
+	}
+	return resp.ToAmount
 }
 
 func (s *FundServer) ValidateFundAccount(ctx context.Context, req *pb.ValidateFundAccountRequest) (*pb.ValidateFundAccountResponse, error) {

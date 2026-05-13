@@ -9,6 +9,7 @@ import (
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/fund-service/handlers"
 	"github.com/RAF-SI-2025/EXBanka-4-Backend/services/fund-service/scheduler"
 	pb_account "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/account"
+	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	"google.golang.org/grpc"
@@ -50,6 +51,19 @@ func main() {
 	defer func() { _ = orderConn.Close() }()
 	orderClient := pb_order.NewOrderServiceClient(orderConn)
 
+	exchangeDB, err := funddb.Connect(os.Getenv("EXCHANGE_DB_URL"))
+	if err != nil {
+		log.Fatalf("failed to connect to exchange_db: %v", err)
+	}
+	defer func() { _ = exchangeDB.Close() }()
+
+	exchangeConn, err := grpc.NewClient(os.Getenv("EXCHANGE_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to exchange-service: %v", err)
+	}
+	defer func() { _ = exchangeConn.Close() }()
+	exchangeClient := pb_exchange.NewExchangeServiceClient(exchangeConn)
+
 	lis, err := net.Listen("tcp", grpcPort)
 	if err != nil {
 		log.Fatalf("failed to listen on %s: %v", grpcPort, err)
@@ -57,11 +71,13 @@ func main() {
 
 	srv := grpc.NewServer()
 	pb.RegisterFundServiceServer(srv, &handlers.FundServer{
-		DB:            fundDB,
-		AccountDB:     accountDB,
-		EmployeeDB:    employeeDB,
-		AccountClient: accountClient,
-		OrderClient:   orderClient,
+		DB:             fundDB,
+		AccountDB:      accountDB,
+		EmployeeDB:     employeeDB,
+		ExchangeDB:     exchangeDB,
+		AccountClient:  accountClient,
+		OrderClient:    orderClient,
+		ExchangeClient: exchangeClient,
 	})
 
 	sched := &scheduler.PerformanceScheduler{DB: fundDB}
