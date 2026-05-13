@@ -31,12 +31,12 @@ func newTestServer(t *testing.T) (*OtcServer, sqlmock.Sqlmock, sqlmock.Sqlmock, 
 	portDB, mPort := newDB()
 	secDB, mSec := newDB()
 	t.Cleanup(func() {
-		db.Close()
-		empDB.Close()
-		cliDB.Close()
-		accDB.Close()
-		portDB.Close()
-		secDB.Close()
+		_ = db.Close()
+		_ = empDB.Close()
+		_ = cliDB.Close()
+		_ = accDB.Close()
+		_ = portDB.Close()
+		_ = secDB.Close()
 	})
 	return &OtcServer{
 		DB: db, EmployeeDB: empDB, ClientDB: cliDB,
@@ -125,7 +125,7 @@ func TestGetUserName_ZeroID(t *testing.T) {
 func TestGetUserName_DBError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectQuery("SELECT first_name").WillReturnError(fmt.Errorf("db error"))
 	name := getUserName(nil, db, 42, "CLIENT")
 	assert.Equal(t, "", name)
