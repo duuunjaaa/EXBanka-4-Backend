@@ -17,3 +17,8 @@ CREATE TABLE clients (
 INSERT INTO clients (first_name, last_name, jmbg, date_of_birth, gender, email, phone_number, address, username, password, active)
 SELECT 'Tara', 'Dunjic', '2809002785018', '2002-09-28', 'F', 'ddimitrijevi822rn@raf.rs', '+381601234567', 'Bulevar oslobodjenja 1, Beograd', 'ddimitrijevi822rn', '$2a$10$KZiA1q9EmV1PlRI0/m7i7e8a2GgitlGORbgHEbb9Y9ZUNYpxyfY.u', true
 WHERE NOT EXISTS (SELECT 1 FROM clients WHERE email = 'ddimitrijevi822rn@raf.rs');
+
+-- Seed second test client for OTC testing (password: markoMarkovic123)
+INSERT INTO clients (first_name, last_name, jmbg, date_of_birth, gender, email, phone_number, address, username, password, active)
+SELECT 'Marko', 'Markovic', '1505001710023', '2001-05-15', 'M', 'marko.markovic.test@raf.rs', '+381641234567', 'Knez Mihailova 10, Beograd', 'markomarkovic', '$2a$10$A6F/b5e5iG4U27zS6GWCKum73MPRd23jO61BMmQf30v575ZAqLPw.', true
+WHERE NOT EXISTS (SELECT 1 FROM clients WHERE email = 'marko.markovic.test@raf.rs');

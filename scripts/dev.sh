@@ -171,10 +171,10 @@ export FUND_SERVICE_ADDR=localhost:50064
 DB_URL="$EMPLOYEE_DB_URL" go run "$REPO_ROOT/services/employee-service/" &
 EMP_PID=$!
 
-DB_URL="$AUTH_DB_URL" go run "$REPO_ROOT/services/auth-service/" &
+DB_URL="$AUTH_DB_URL" REDIS_ADDR=localhost:6379 go run "$REPO_ROOT/services/auth-service/" &
 AUTH_PID=$!
 
-PORTFOLIO_SERVICE_ADDR=localhost:50062 go run "$REPO_ROOT/services/api-gateway/" &
+PORTFOLIO_SERVICE_ADDR=localhost:50062 REDIS_ADDR=localhost:6379 go run "$REPO_ROOT/services/api-gateway/" &
 GW_PID=$!
 
 (cd "$REPO_ROOT/services/email-service" && go run .) &
@@ -186,7 +186,7 @@ ACC_PID=$!
 DB_URL="$CLIENT_DB_URL" go run "$REPO_ROOT/services/client-service/" &
 CLIENT_PID=$!
 
-go run "$REPO_ROOT/services/exchange-service/" &
+REDIS_ADDR=localhost:6379 go run "$REPO_ROOT/services/exchange-service/" &
 EXCHANGE_PID=$!
 
 go run "$REPO_ROOT/services/payment-service/" &
@@ -198,7 +198,7 @@ CARD_PID=$!
 go run "$REPO_ROOT/services/loan-service/" &
 LOAN_PID=$!
 
-go run "$REPO_ROOT/services/securities-service/" &
+REDIS_ADDR=localhost:6379 go run "$REPO_ROOT/services/securities-service/" &
 SEC_PID=$!
 
 SECURITIES_SERVICE_ADDR=localhost:50060 go run "$REPO_ROOT/services/portfolio-service/" &
