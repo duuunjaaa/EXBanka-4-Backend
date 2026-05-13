@@ -75,6 +75,9 @@ func (m *mockEmpClient) ResetAllActuaryUsedLimits(ctx context.Context, in *pb_em
 func (m *mockEmpClient) GetActuaryPerformers(ctx context.Context, in *pb_emp.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb_emp.GetActuaryPerformersResponse, error) {
 	return nil, nil
 }
+func (m *mockEmpClient) GetSupervisors(ctx context.Context, in *pb_emp.GetSupervisorsRequest, opts ...grpc.CallOption) (*pb_emp.GetSupervisorsResponse, error) {
+	return nil, nil
+}
 
 type mockLoanClient struct {
 	loans []*pb_loan.LoanSummary
@@ -351,7 +354,7 @@ func TestSettle_Buy_SameCurrency(t *testing.T) {
 		ExchangeClient: &mockExchangeClient{},
 	}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 	assert.NoError(t, accMock.ExpectationsWereMet())
 	assert.NoError(t, exchMock.ExpectationsWereMet())
@@ -392,7 +395,7 @@ func TestSettle_Sell_SameCurrency(t *testing.T) {
 		ExchangeClient: &mockExchangeClient{},
 	}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 	assert.NoError(t, accMock.ExpectationsWereMet())
 	assert.NoError(t, exchMock.ExpectationsWereMet())
@@ -420,7 +423,7 @@ func TestSettle_Buy_InsufficientFunds(t *testing.T) {
 
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB, ExchangeClient: &mockExchangeClient{}}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "insufficient funds")
 }
@@ -595,7 +598,7 @@ func TestSettle_ExchangeClientError_Continues(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB, ExchangeClient: &mockExchangeClientError{}}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -609,7 +612,7 @@ func TestSettle_AccountCurrencyIDError(t *testing.T) {
 	accMock.ExpectQuery(`SELECT currency_id FROM accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "account currency_id")
 }
@@ -626,7 +629,7 @@ func TestSettle_CurrencyCodeError(t *testing.T) {
 	exchMock.ExpectQuery(`SELECT code FROM currencies`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "currency code")
 }
@@ -645,7 +648,7 @@ func TestSettle_Buy_ExecError(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -663,7 +666,7 @@ func TestSettle_Sell_ExecError(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -681,7 +684,7 @@ func TestSettle_ZeroCommission_NoBank(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 0.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 0.0, "USD")
 	require.NoError(t, err)
 	assert.NoError(t, accMock.ExpectationsWereMet())
 }
@@ -701,7 +704,7 @@ func TestSettle_CurrencyIDLookupError(t *testing.T) {
 	exchMock.ExpectQuery(`SELECT id FROM currencies`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -722,7 +725,7 @@ func TestSettle_BankAccountIDLookupError(t *testing.T) {
 	accMock.ExpectQuery(`SELECT id FROM accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -745,7 +748,7 @@ func TestSettle_BankAccountUpdateError(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -772,7 +775,7 @@ func TestSettle_Buy_DifferentCurrency_AccountRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -797,7 +800,7 @@ func TestSettle_Buy_DifferentCurrency_SecurityRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
 	require.NoError(t, err)
 }
 
@@ -824,7 +827,7 @@ func TestSettle_Buy_DifferentCurrency_BothForeign(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -849,7 +852,7 @@ func TestSettle_Sell_DifferentCurrency_AccountRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -874,7 +877,7 @@ func TestSettle_Sell_DifferentCurrency_SecurityRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
 	require.NoError(t, err)
 }
 
@@ -901,7 +904,7 @@ func TestSettle_Sell_DifferentCurrency_BothForeign(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -920,7 +923,7 @@ func TestSettle_DifferentCurrency_RateError(t *testing.T) {
 		WillReturnError(fmt.Errorf("no rate"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exchange rate")
 }
