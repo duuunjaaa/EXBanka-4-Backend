@@ -1088,8 +1088,8 @@ func TestFillInterval_AfterHours(t *testing.T) {
 // ── mock fund and portfolio clients ──────────────────────────────────────────
 
 type mockFundClient struct {
-	updateHoldingErr         error
-	checkPendingErr          error
+	updateHoldingErr error
+	checkPendingErr  error
 }
 
 func (m *mockFundClient) Ping(ctx context.Context, in *pb_fund.PingRequest, opts ...grpc.CallOption) (*pb_fund.PingResponse, error) {
