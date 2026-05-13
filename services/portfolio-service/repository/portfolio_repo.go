@@ -73,7 +73,7 @@ func GetHoldings(ctx context.Context, db *sql.DB, userID int64, userType string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []models.PortfolioEntry
 	for rows.Next() {

@@ -932,7 +932,7 @@ func (s *FundServer) GetFundPerformanceHistory(ctx context.Context, req *pb.GetF
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "query performance history: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var records []*pb.PerformanceRecord
 	for rows.Next() {

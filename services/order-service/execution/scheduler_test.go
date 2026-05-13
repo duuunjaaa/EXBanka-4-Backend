@@ -75,6 +75,9 @@ func (m *mockEmpClient) ResetAllActuaryUsedLimits(ctx context.Context, in *pb_em
 func (m *mockEmpClient) GetActuaryPerformers(ctx context.Context, in *pb_emp.GetActuaryPerformersRequest, opts ...grpc.CallOption) (*pb_emp.GetActuaryPerformersResponse, error) {
 	return nil, nil
 }
+func (m *mockEmpClient) GetSupervisors(ctx context.Context, in *pb_emp.GetSupervisorsRequest, opts ...grpc.CallOption) (*pb_emp.GetSupervisorsResponse, error) {
+	return nil, nil
+}
 
 type mockLoanClient struct {
 	loans []*pb_loan.LoanSummary
@@ -351,7 +354,7 @@ func TestSettle_Buy_SameCurrency(t *testing.T) {
 		ExchangeClient: &mockExchangeClient{},
 	}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 	assert.NoError(t, accMock.ExpectationsWereMet())
 	assert.NoError(t, exchMock.ExpectationsWereMet())
@@ -392,7 +395,7 @@ func TestSettle_Sell_SameCurrency(t *testing.T) {
 		ExchangeClient: &mockExchangeClient{},
 	}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 	assert.NoError(t, accMock.ExpectationsWereMet())
 	assert.NoError(t, exchMock.ExpectationsWereMet())
@@ -420,7 +423,7 @@ func TestSettle_Buy_InsufficientFunds(t *testing.T) {
 
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB, ExchangeClient: &mockExchangeClient{}}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "insufficient funds")
 }
@@ -595,7 +598,7 @@ func TestSettle_ExchangeClientError_Continues(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB, ExchangeClient: &mockExchangeClientError{}}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -609,7 +612,7 @@ func TestSettle_AccountCurrencyIDError(t *testing.T) {
 	accMock.ExpectQuery(`SELECT currency_id FROM accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "account currency_id")
 }
@@ -626,7 +629,7 @@ func TestSettle_CurrencyCodeError(t *testing.T) {
 	exchMock.ExpectQuery(`SELECT code FROM currencies`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "currency code")
 }
@@ -645,7 +648,7 @@ func TestSettle_Buy_ExecError(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -663,7 +666,7 @@ func TestSettle_Sell_ExecError(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -681,7 +684,7 @@ func TestSettle_ZeroCommission_NoBank(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 0.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 0.0, "USD")
 	require.NoError(t, err)
 	assert.NoError(t, accMock.ExpectationsWereMet())
 }
@@ -701,7 +704,7 @@ func TestSettle_CurrencyIDLookupError(t *testing.T) {
 	exchMock.ExpectQuery(`SELECT id FROM currencies`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -722,7 +725,7 @@ func TestSettle_BankAccountIDLookupError(t *testing.T) {
 	accMock.ExpectQuery(`SELECT id FROM accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -745,7 +748,7 @@ func TestSettle_BankAccountUpdateError(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnError(fmt.Errorf("db error"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 }
 
@@ -772,7 +775,7 @@ func TestSettle_Buy_DifferentCurrency_AccountRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -797,7 +800,7 @@ func TestSettle_Buy_DifferentCurrency_SecurityRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
 	require.NoError(t, err)
 }
 
@@ -824,7 +827,7 @@ func TestSettle_Buy_DifferentCurrency_BothForeign(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -849,7 +852,7 @@ func TestSettle_Sell_DifferentCurrency_AccountRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -874,7 +877,7 @@ func TestSettle_Sell_DifferentCurrency_SecurityRSD(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "EMPLOYEE"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "RSD")
 	require.NoError(t, err)
 }
 
@@ -901,7 +904,7 @@ func TestSettle_Sell_DifferentCurrency_BothForeign(t *testing.T) {
 	accMock.ExpectExec(`UPDATE accounts`).WillReturnResult(sqlmock.NewResult(0, 1))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "SELL", UserType: "CLIENT"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	require.NoError(t, err)
 }
 
@@ -920,7 +923,7 @@ func TestSettle_DifferentCurrency_RateError(t *testing.T) {
 		WillReturnError(fmt.Errorf("no rate"))
 	s := &Scheduler{AccountDB: accDB, ExchangeDB: exchDB}
 	order := models.Order{AccountID: 1, Direction: "BUY"}
-	err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
+	_, err = s.settleAccountAndCommission(context.Background(), order, 100.0, 10.0, "USD")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exchange rate")
 }
@@ -1088,8 +1091,8 @@ func TestFillInterval_AfterHours(t *testing.T) {
 // ── mock fund and portfolio clients ──────────────────────────────────────────
 
 type mockFundClient struct {
-	updateHoldingErr         error
-	checkPendingErr          error
+	updateHoldingErr error
+	checkPendingErr  error
 }
 
 func (m *mockFundClient) Ping(ctx context.Context, in *pb_fund.PingRequest, opts ...grpc.CallOption) (*pb_fund.PingResponse, error) {
@@ -1178,16 +1181,16 @@ func (m *mockPortfolioClient) CollectTaxForUser(ctx context.Context, in *pb_port
 func TestExecuteOrder_FullLoop_Happy(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 
@@ -1245,16 +1248,16 @@ func TestExecuteOrder_FullLoop_Happy(t *testing.T) {
 func TestExecuteOrder_FullLoop_WithPortfolioClient(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 
@@ -1303,16 +1306,16 @@ func TestExecuteOrder_FullLoop_WithPortfolioClient(t *testing.T) {
 func TestExecuteOrder_FullLoop_WithFundClient_Sell(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 
@@ -1362,16 +1365,16 @@ func TestExecuteOrder_FullLoop_WithFundClient_Sell(t *testing.T) {
 func TestExecuteOrder_SettlementFails_InLoop(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000}
 
@@ -1424,16 +1427,16 @@ func expectBuySettle(accMock, exchMock sqlmock.Sqlmock) {
 func TestExecuteOrder_Loop_LimitStopValuePointers(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1460,16 +1463,16 @@ func TestExecuteOrder_Loop_LimitStopValuePointers(t *testing.T) {
 func TestExecuteOrder_Loop_IsAON(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1494,16 +1497,16 @@ func TestExecuteOrder_Loop_IsAON(t *testing.T) {
 func TestExecuteOrder_Loop_FundUpdateError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1529,16 +1532,16 @@ func TestExecuteOrder_Loop_FundUpdateError(t *testing.T) {
 func TestExecuteOrder_Loop_PortfolioUpdateError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1564,16 +1567,16 @@ func TestExecuteOrder_Loop_PortfolioUpdateError(t *testing.T) {
 func TestExecuteOrder_Loop_UpdateRemainingError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1598,16 +1601,16 @@ func TestExecuteOrder_Loop_UpdateRemainingError(t *testing.T) {
 func TestExecuteOrder_Loop_SetOrderDoneError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1632,16 +1635,16 @@ func TestExecuteOrder_Loop_SetOrderDoneError(t *testing.T) {
 func TestExecuteOrder_Loop_CheckPendingWithdrawalsError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).

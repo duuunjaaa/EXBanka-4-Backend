@@ -187,11 +187,16 @@ func (s *Scheduler) executeOrder(order models.Order) {
 		commission := CalculateCommission(order.OrderType, totalPrice)
 
 		// 5. Settle account balance and transfer commission to bank.
-		if err := s.settleAccountAndCommission(ctx, order, totalPrice, commission, currencyCode); err != nil {
+		// Returns the total in account currency (converted from security currency when needed).
+		settledTotal, err := s.settleAccountAndCommission(ctx, order, totalPrice, commission, currencyCode)
+		if err != nil {
 			log.Printf("order-scheduler: settlement failed for order %d: %v — declining", order.ID, err)
 			_ = repository.UpdateOrderStatus(ctx, s.DB, order.ID, "DECLINED", nil)
 			return
 		}
+		// Price per unit in account currency — used to keep liquid_assets and average_cost in the
+		// same currency as the fund account (RSD), not the security's trading currency.
+		settledPricePerUnit := settledTotal / float64(fillQty) / float64(order.ContractSize)
 
 		// 6. Record partial fill
 		portion := &models.OrderPortion{
@@ -210,7 +215,7 @@ func (s *Scheduler) executeOrder(order models.Order) {
 				FundId:    order.FundID,
 				ListingId: order.AssetID,
 				Quantity:  int64(fillQty),
-				Price:     pricePerUnit,
+				Price:     settledPricePerUnit,
 				Direction: order.Direction,
 			})
 			if err != nil {
@@ -319,7 +324,8 @@ func (s *Scheduler) listingCurrency(ctx context.Context, listingID int64) (strin
 // When the security's currency differs from the account's currency, amounts are
 // converted using today's exchange rates. CLIENT orders include a 0.5% exchange
 // commission; EMPLOYEE (agent) orders do not.
-func (s *Scheduler) settleAccountAndCommission(ctx context.Context, order models.Order, totalPrice, commission float64, currencyCode string) error {
+// settleAccountAndCommission returns the settled total in account currency (after conversion).
+func (s *Scheduler) settleAccountAndCommission(ctx context.Context, order models.Order, totalPrice, commission float64, currencyCode string) (float64, error) {
 	const exchangeCommRate = 0.005
 
 	// 0. Ensure today's exchange rates are seeded (lazy population via exchange-service).
@@ -334,13 +340,13 @@ func (s *Scheduler) settleAccountAndCommission(ctx context.Context, order models
 	if err := s.AccountDB.QueryRowContext(ctx,
 		`SELECT currency_id FROM accounts WHERE id = $1`, order.AccountID,
 	).Scan(&accountCurrencyID); err != nil {
-		return fmt.Errorf("account currency_id: %w", err)
+		return 0, fmt.Errorf("account currency_id: %w", err)
 	}
 	var accountCurrencyCode string
 	if err := s.ExchangeDB.QueryRowContext(ctx,
 		`SELECT code FROM currencies WHERE id = $1`, accountCurrencyID,
 	).Scan(&accountCurrencyCode); err != nil {
-		return fmt.Errorf("currency code: %w", err)
+		return 0, fmt.Errorf("currency code: %w", err)
 	}
 
 	bankCurrencyCode := currencyCode
@@ -411,7 +417,7 @@ func (s *Scheduler) settleAccountAndCommission(ctx context.Context, order models
 			}
 		}
 		if convErr != nil {
-			return fmt.Errorf("exchange rate for %s: %w", currencyCode, convErr)
+			return 0, fmt.Errorf("exchange rate for %s: %w", currencyCode, convErr)
 		}
 
 		convertedTotal := totalPrice * convRate
@@ -438,11 +444,11 @@ func (s *Scheduler) settleAccountAndCommission(ctx context.Context, order models
 			accountDelta, order.AccountID, debitAmount,
 		)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		rows, _ := result.RowsAffected()
 		if rows == 0 {
-			return fmt.Errorf("insufficient funds for order %d", order.ID)
+			return 0, fmt.Errorf("insufficient funds for order %d", order.ID)
 		}
 	} else {
 		accountDelta = totalPrice - commission
@@ -450,30 +456,30 @@ func (s *Scheduler) settleAccountAndCommission(ctx context.Context, order models
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
 			accountDelta, order.AccountID,
 		); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
 	// 4. Credit commission to bank account (in account currency).
 	if commission <= 0 {
-		return nil
+		return totalPrice, nil
 	}
 	var currencyID int64
 	if err := s.ExchangeDB.QueryRowContext(ctx,
 		`SELECT id FROM currencies WHERE code = $1`, bankCurrencyCode,
 	).Scan(&currencyID); err != nil {
-		return err
+		return 0, err
 	}
 	var bankAccountID int64
 	if err := s.AccountDB.QueryRowContext(ctx,
 		`SELECT id FROM accounts WHERE account_type = 'BANK' AND owner_id = 0 AND currency_id = $1`,
 		currencyID,
 	).Scan(&bankAccountID); err != nil {
-		return err
+		return 0, err
 	}
 	_, err := s.AccountDB.ExecContext(ctx,
 		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
 		commission, bankAccountID,
 	)
-	return err
+	return totalPrice, err
 }
