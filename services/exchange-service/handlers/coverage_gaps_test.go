@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/DATA-DOG/go-sqlmock"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func seedRateCache(t *testing.T, mr *miniredis.Miniredis) {
 	}
 	data, err := json.Marshal(rates)
 	require.NoError(t, err)
-	mr.Set(ratesCacheKey(), string(data))
+	require.NoError(t, mr.Set(ratesCacheKey(), string(data)))
 }
 
 // ── ConvertAmount: source currency code error (line 267-269) ─────────────────
