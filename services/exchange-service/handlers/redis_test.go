@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +46,7 @@ func TestLoadCachedRates_KeyMissing_ReturnsNil(t *testing.T) {
 
 func TestLoadCachedRates_InvalidJSON_ReturnsNil(t *testing.T) {
 	mr, rdb := newRedisServer(t)
-	mr.Set(ratesCacheKey(), "not-json")
+	require.NoError(t, mr.Set(ratesCacheKey(), "not-json"))
 
 	s := &ExchangeServer{Redis: rdb}
 	assert.Nil(t, s.loadCachedRates(context.Background()))
@@ -61,7 +61,7 @@ func TestLoadCachedRates_ValidCache_ReturnsParsedRates(t *testing.T) {
 	}
 	data, err := json.Marshal(payload)
 	require.NoError(t, err)
-	mr.Set(ratesCacheKey(), string(data))
+	require.NoError(t, mr.Set(ratesCacheKey(), string(data)))
 
 	s := &ExchangeServer{Redis: rdb}
 	result := s.loadCachedRates(context.Background())

@@ -53,6 +53,19 @@ CREATE TABLE daily_exchange_rates (
     UNIQUE (currency_code, date)
 );
 
+-- Seed approximate rates for today so the order-service limit check works on a fresh DB.
+-- The exchange-service overwrites these with real API rates when it starts up.
+INSERT INTO daily_exchange_rates (currency_code, buying_rate, selling_rate, middle_rate, date)
+VALUES
+  ('EUR', 116.00, 117.00, 116.50, CURRENT_DATE),
+  ('CHF', 115.00, 116.00, 115.50, CURRENT_DATE),
+  ('USD', 107.50, 108.50, 108.00, CURRENT_DATE),
+  ('GBP', 135.00, 136.00, 135.50, CURRENT_DATE),
+  ('JPY',   0.72,   0.73,   0.725, CURRENT_DATE),
+  ('CAD',  79.00,  80.00,  79.50, CURRENT_DATE),
+  ('AUD',  69.00,  70.00,  69.50, CURRENT_DATE)
+ON CONFLICT (currency_code, date) DO NOTHING;
+
 -- Exchange transaction history (issue #76)
 CREATE TABLE exchange_transactions (
     id            BIGSERIAL PRIMARY KEY,
