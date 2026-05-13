@@ -1181,16 +1181,16 @@ func (m *mockPortfolioClient) CollectTaxForUser(ctx context.Context, in *pb_port
 func TestExecuteOrder_FullLoop_Happy(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 
@@ -1248,16 +1248,16 @@ func TestExecuteOrder_FullLoop_Happy(t *testing.T) {
 func TestExecuteOrder_FullLoop_WithPortfolioClient(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 
@@ -1306,16 +1306,16 @@ func TestExecuteOrder_FullLoop_WithPortfolioClient(t *testing.T) {
 func TestExecuteOrder_FullLoop_WithFundClient_Sell(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 
@@ -1365,16 +1365,16 @@ func TestExecuteOrder_FullLoop_WithFundClient_Sell(t *testing.T) {
 func TestExecuteOrder_SettlementFails_InLoop(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000}
 
@@ -1427,16 +1427,16 @@ func expectBuySettle(accMock, exchMock sqlmock.Sqlmock) {
 func TestExecuteOrder_Loop_LimitStopValuePointers(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1463,16 +1463,16 @@ func TestExecuteOrder_Loop_LimitStopValuePointers(t *testing.T) {
 func TestExecuteOrder_Loop_IsAON(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1497,16 +1497,16 @@ func TestExecuteOrder_Loop_IsAON(t *testing.T) {
 func TestExecuteOrder_Loop_FundUpdateError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1532,16 +1532,16 @@ func TestExecuteOrder_Loop_FundUpdateError(t *testing.T) {
 func TestExecuteOrder_Loop_PortfolioUpdateError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1567,16 +1567,16 @@ func TestExecuteOrder_Loop_PortfolioUpdateError(t *testing.T) {
 func TestExecuteOrder_Loop_UpdateRemainingError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1601,16 +1601,16 @@ func TestExecuteOrder_Loop_UpdateRemainingError(t *testing.T) {
 func TestExecuteOrder_Loop_SetOrderDoneError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
@@ -1635,16 +1635,16 @@ func TestExecuteOrder_Loop_SetOrderDoneError(t *testing.T) {
 func TestExecuteOrder_Loop_CheckPendingWithdrawalsError(t *testing.T) {
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	accDB, accMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accDB.Close()
+	defer func() { _ = accDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 
 	listing := &pb_sec.ListingSummary{Ask: 100.0, Bid: 99.0, Volume: 1000, Type: "STOCK"}
 	secMock.ExpectQuery(`SELECT e\.currency`).
