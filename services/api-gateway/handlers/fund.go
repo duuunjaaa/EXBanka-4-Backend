@@ -276,9 +276,13 @@ func InvestFund(client pb.FundServiceClient) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 		defer cancel()
 
+		clientID := userID
+		if callerRole == "EMPLOYEE" {
+			clientID = 0
+		}
 		resp, err := client.InvestFund(ctx, &pb.InvestFundRequest{
 			FundId:          fundID,
-			ClientId:        userID,
+			ClientId:        clientID,
 			ClientType:      clientType,
 			SourceAccountId: req.SourceAccountId,
 			Amount:          req.Amount,
@@ -329,9 +333,13 @@ func WithdrawFund(client pb.FundServiceClient) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 		defer cancel()
 
+		withdrawClientID := userID
+		if callerRole == "EMPLOYEE" {
+			withdrawClientID = 0
+		}
 		resp, err := client.WithdrawFund(ctx, &pb.WithdrawFundRequest{
 			FundId:               fundID,
-			ClientId:             userID,
+			ClientId:             withdrawClientID,
 			ClientType:           clientType,
 			DestinationAccountId: req.DestinationAccountId,
 			Amount:               amount,

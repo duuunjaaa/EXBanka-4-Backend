@@ -33,7 +33,7 @@ func (s *PerformanceScheduler) snapshotAll(ctx context.Context) {
 		log.Printf("performance-scheduler: list funds error: %v", err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var fundID int64

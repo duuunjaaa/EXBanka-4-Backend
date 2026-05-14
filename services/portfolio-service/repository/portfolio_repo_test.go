@@ -30,7 +30,7 @@ func TestSharedUserID_OtherType(t *testing.T) {
 func TestUpsertHolding_BUY_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectExec(`INSERT INTO portfolio_entry`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -44,7 +44,7 @@ func TestUpsertHolding_BUY_Success(t *testing.T) {
 func TestUpsertHolding_BUY_Employee_SharedUID(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// EMPLOYEE → uid=0
 	mock.ExpectExec(`INSERT INTO portfolio_entry`).
@@ -58,7 +58,7 @@ func TestUpsertHolding_BUY_Employee_SharedUID(t *testing.T) {
 func TestUpsertHolding_BUY_Error(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectExec(`INSERT INTO portfolio_entry`).
 		WillReturnError(sql.ErrConnDone)
@@ -72,7 +72,7 @@ func TestUpsertHolding_BUY_Error(t *testing.T) {
 func TestUpsertHolding_SELL_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT buy_price FROM portfolio_entry`).
 		WillReturnRows(sqlmock.NewRows([]string{"buy_price"}).AddRow(150.0))
@@ -90,7 +90,7 @@ func TestUpsertHolding_SELL_Success(t *testing.T) {
 func TestUpsertHolding_SELL_ScanError_ContinuesWithZero(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// scan fails → buyPrice stays 0, operation continues
 	mock.ExpectQuery(`SELECT buy_price FROM portfolio_entry`).
@@ -108,7 +108,7 @@ func TestUpsertHolding_SELL_ScanError_ContinuesWithZero(t *testing.T) {
 func TestUpsertHolding_SELL_UpdateError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT buy_price FROM portfolio_entry`).
 		WillReturnRows(sqlmock.NewRows([]string{"buy_price"}).AddRow(120.0))
@@ -122,7 +122,7 @@ func TestUpsertHolding_SELL_UpdateError(t *testing.T) {
 func TestUpsertHolding_SELL_DeleteError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT buy_price FROM portfolio_entry`).
 		WillReturnRows(sqlmock.NewRows([]string{"buy_price"}).AddRow(120.0))
@@ -145,7 +145,7 @@ var holdingCols = []string{
 func TestGetHoldings_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ts := time.Now()
 	mock.ExpectQuery(`SELECT id, user_id`).
@@ -167,7 +167,7 @@ func TestGetHoldings_Success(t *testing.T) {
 func TestGetHoldings_Employee_SharedUID(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ts := time.Now()
 	mock.ExpectQuery(`SELECT id, user_id`).
@@ -185,7 +185,7 @@ func TestGetHoldings_Employee_SharedUID(t *testing.T) {
 func TestGetHoldings_Empty(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT id, user_id`).
 		WillReturnRows(sqlmock.NewRows(holdingCols))
@@ -198,7 +198,7 @@ func TestGetHoldings_Empty(t *testing.T) {
 func TestGetHoldings_QueryError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT id, user_id`).
 		WillReturnError(sql.ErrConnDone)
@@ -210,7 +210,7 @@ func TestGetHoldings_QueryError(t *testing.T) {
 func TestGetHoldings_ScanError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// "bad" can't scan into int64 for id field
 	mock.ExpectQuery(`SELECT id, user_id`).

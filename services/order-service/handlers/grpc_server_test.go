@@ -1207,16 +1207,16 @@ func TestCreateOrder_Employee_CurrencyConversion(t *testing.T) {
 	// EMPLOYEE order, non-RSD listing currency → approxPriceRSD = approxPrice * rate.
 	db, dbMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	empDB, empMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer empDB.Close()
+	defer func() { _ = empDB.Close() }()
 	secDB, secMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer secDB.Close()
+	defer func() { _ = secDB.Close() }()
 	exchDB, exchMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchDB.Close()
+	defer func() { _ = exchDB.Close() }()
 
 	srv := &handlers.OrderServer{
 		DB: db, EmployeeDB: empDB, SecuritiesDB: secDB, ExchangeDB: exchDB,

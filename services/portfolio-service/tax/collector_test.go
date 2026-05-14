@@ -37,15 +37,15 @@ func (m *mockExchangeClient) PreviewConversion(_ context.Context, _ *pb_ex.Previ
 func TestCollectUnpaid_RSD_SingleRecord(t *testing.T) {
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	// unpaid records query
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
@@ -92,15 +92,15 @@ func TestCollectUnpaid_RSD_SingleRecord(t *testing.T) {
 func TestCollectUnpaid_ForeignCurrency_ConvertsToRSD(t *testing.T) {
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	exchangeClient := &mockExchangeClient{
 		rates: []*pb_ex.ExchangeRate{
@@ -150,15 +150,15 @@ func TestCollectUnpaid_ForeignCurrency_ConvertsToRSD(t *testing.T) {
 func TestCollectUnpaid_NoRecords(t *testing.T) {
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}))
@@ -208,11 +208,11 @@ func TestFetchMiddleRates_Success(t *testing.T) {
 func TestGetAccountCurrency_ExchangeDBError(t *testing.T) {
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	aMock.ExpectQuery(`SELECT currency_id FROM accounts`).
 		WithArgs(int64(10)).
@@ -229,11 +229,11 @@ func TestGetAccountCurrency_ExchangeDBError(t *testing.T) {
 func TestGetAccountCurrency_AccountDBError(t *testing.T) {
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	aMock.ExpectQuery(`SELECT currency_id FROM accounts`).
 		WithArgs(int64(10)).
@@ -248,7 +248,7 @@ func TestGetAccountCurrency_AccountDBError(t *testing.T) {
 func TestGetAccountForUser_Employee(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// EMPLOYEE → uid=0
 	mock.ExpectQuery(`SELECT account_id FROM portfolio_entry`).
@@ -263,7 +263,7 @@ func TestGetAccountForUser_Employee(t *testing.T) {
 func TestGetAccountForUser_Error(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT account_id FROM portfolio_entry`).
 		WithArgs(int64(10), "CLIENT").
@@ -278,15 +278,15 @@ func TestGetAccountForUser_Error(t *testing.T) {
 func TestCollectUnpaid_LoadError(t *testing.T) {
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WillReturnError(sql.ErrConnDone)
@@ -298,15 +298,15 @@ func TestCollectUnpaid_LoadError(t *testing.T) {
 func TestCollectUnpaid_PerUser_Path(t *testing.T) {
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	// userID != 0 → GetUnpaidRecordsForUser
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
@@ -345,15 +345,15 @@ func TestCollectUnpaid_GetAccountForUser_Skips(t *testing.T) {
 	// getAccountForUser returns error → record is skipped (continue)
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}).
@@ -371,15 +371,15 @@ func TestCollectUnpaid_GetAccountCurrency_Skips(t *testing.T) {
 	// getAccountCurrency returns error → record is skipped
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, _, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}).
@@ -399,15 +399,15 @@ func TestCollectUnpaid_FetchRatesError_ReturnsError(t *testing.T) {
 	// fetchMiddleRates fails → CollectUnpaid returns error
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}).
@@ -430,15 +430,15 @@ func TestCollectUnpaid_MissingExchangeRate_Skips(t *testing.T) {
 	// Rate for currency not in map → record is skipped
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	exchangeClient := &mockExchangeClient{
 		rates: []*pb_ex.ExchangeRate{
@@ -468,15 +468,15 @@ func TestCollectUnpaid_ZeroMiddleRate_Skips(t *testing.T) {
 	// middleRate == 0 → skipped
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	exchangeClient := &mockExchangeClient{
 		rates: []*pb_ex.ExchangeRate{
@@ -505,15 +505,15 @@ func TestCollectUnpaid_DeductFromAccount_Skips(t *testing.T) {
 	// deductFromAccount fails → record is skipped, no error returned
 	portfolioDB, pMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer portfolioDB.Close()
+	defer func() { _ = portfolioDB.Close() }()
 
 	accountDB, aMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer accountDB.Close()
+	defer func() { _ = accountDB.Close() }()
 
 	exchangeDB, eMock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer exchangeDB.Close()
+	defer func() { _ = exchangeDB.Close() }()
 
 	pMock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}).

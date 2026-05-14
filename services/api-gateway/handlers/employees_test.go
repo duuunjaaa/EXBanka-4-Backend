@@ -122,6 +122,9 @@ func (s *stubEmpClient) GetActuaryPerformers(ctx context.Context, in *pb.GetActu
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubEmpClient) GetSupervisors(ctx context.Context, in *pb.GetSupervisorsRequest, opts ...grpc.CallOption) (*pb.GetSupervisorsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // ---- stub auth client ----
 
