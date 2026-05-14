@@ -130,6 +130,9 @@ func (s *stubEmployeeClient) ResetAllActuaryUsedLimits(_ context.Context, _ *pb_
 func (s *stubEmployeeClient) GetActuaryPerformers(_ context.Context, _ *pb_emp.GetActuaryPerformersRequest, _ ...grpc.CallOption) (*pb_emp.GetActuaryPerformersResponse, error) {
 	return nil, nil
 }
+func (s *stubEmployeeClient) GetSupervisors(_ context.Context, _ *pb_emp.GetSupervisorsRequest, _ ...grpc.CallOption) (*pb_emp.GetSupervisorsResponse, error) {
+	return nil, nil
+}
 
 // ---- CreateOrder ----
 
