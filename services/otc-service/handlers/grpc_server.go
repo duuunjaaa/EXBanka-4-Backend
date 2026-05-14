@@ -11,6 +11,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// retryExec retries a DB Exec up to 3 times with linear backoff.
+// Uses db.Exec (not ExecContext) so it survives a cancelled request context (e.g. during compensation).
+func retryExec(db *sql.DB, query string, args ...interface{}) {
+	for attempt := 1; attempt <= 3; attempt++ {
+		if _, err := db.Exec(query, args...); err == nil {
+			return
+		}
+		time.Sleep(time.Duration(attempt*100) * time.Millisecond)
+	}
+}
+
 // currency code → currency_id mapping (stable seed values from account-service)
 var currencyIDMap = map[string]int64{
 	"RSD": 1, "EUR": 2, "CHF": 3, "USD": 4,
@@ -101,12 +112,13 @@ func (s *OtcServer) CreateNegotiation(ctx context.Context, req *pb.CreateNegotia
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "unknown ticker: %s", req.Ticker)
 	}
-	var portfolioAmount int64
+	// Free shares = portfolio amount minus saga-reserved shares (transient ExerciseContract reservations).
+	var portfolioFree int64
 	portfolioErr := s.PortfolioDB.QueryRowContext(ctx, `
-		SELECT COALESCE(amount, 0) FROM portfolio_entry
+		SELECT COALESCE(amount - reserved_amount, 0) FROM portfolio_entry
 		WHERE user_id = $1 AND user_type = $2 AND listing_id = $3`,
 		portfolioUserID(req.SellerId, req.SellerType), req.SellerType, listingID,
-	).Scan(&portfolioAmount)
+	).Scan(&portfolioFree)
 	if portfolioErr != nil && portfolioErr != sql.ErrNoRows {
 		return nil, status.Errorf(codes.Internal, "failed to check seller portfolio: %v", portfolioErr)
 	}
@@ -124,10 +136,10 @@ func (s *OtcServer) CreateNegotiation(ctx context.Context, req *pb.CreateNegotia
 		req.Ticker, req.SellerId, req.SellerType,
 	).Scan(&pendingNegotiationsSum)
 	committed := activeContractsSum + pendingNegotiationsSum
-	if portfolioAmount < committed+int64(req.Amount) {
+	if portfolioFree < committed+int64(req.Amount) {
 		return nil, status.Errorf(codes.InvalidArgument,
 			"seller does not have enough free shares (available: %d, requested: %d)",
-			portfolioAmount-committed, req.Amount)
+			portfolioFree-committed, req.Amount)
 	}
 
 	now := time.Now()
@@ -189,11 +201,24 @@ func (s *OtcServer) GetNegotiation(ctx context.Context, req *pb.GetNegotiationRe
 }
 
 func (s *OtcServer) CounterOffer(ctx context.Context, req *pb.CounterOfferRequest) (*pb.NegotiationResponse, error) {
+	if req.SettlementDate == "" {
+		return nil, status.Error(codes.InvalidArgument, "settlement date is required")
+	}
+	if settlementDate, parseErr := time.Parse("2006-01-02", req.SettlementDate); parseErr != nil || !settlementDate.After(time.Now().Truncate(24*time.Hour)) {
+		return nil, status.Error(codes.InvalidArgument, "settlement date must be in the future")
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var sellerID, buyerID int64
 	var sellerType, buyerType, currentStatus string
-	err := s.DB.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT seller_id, seller_type, buyer_id, buyer_type, status
-		FROM otc_negotiations WHERE id = $1`, req.NegotiationId,
+		FROM otc_negotiations WHERE id = $1 FOR UPDATE`, req.NegotiationId,
 	).Scan(&sellerID, &sellerType, &buyerID, &buyerType, &currentStatus)
 	if err == sql.ErrNoRows {
 		return nil, status.Error(codes.NotFound, "negotiation not found")
@@ -206,7 +231,6 @@ func (s *OtcServer) CounterOffer(ctx context.Context, req *pb.CounterOfferReques
 	if !isSeller && !isBuyer {
 		return nil, status.Error(codes.PermissionDenied, "caller is not a participant in this negotiation")
 	}
-
 	if currentStatus == "PENDING_SELLER" && !isSeller {
 		return nil, status.Error(codes.AlreadyExists, "not your turn: waiting for seller")
 	}
@@ -217,20 +241,13 @@ func (s *OtcServer) CounterOffer(ctx context.Context, req *pb.CounterOfferReques
 		return nil, status.Errorf(codes.FailedPrecondition, "negotiation is in terminal state: %s", currentStatus)
 	}
 
-	if req.SettlementDate == "" {
-		return nil, status.Error(codes.InvalidArgument, "settlement date is required")
-	}
-	if settlementDate, parseErr := time.Parse("2006-01-02", req.SettlementDate); parseErr != nil || !settlementDate.After(time.Now().Truncate(24*time.Hour)) {
-		return nil, status.Error(codes.InvalidArgument, "settlement date must be in the future")
-	}
-
 	newStatus := "PENDING_BUYER"
 	if isBuyer {
 		newStatus = "PENDING_SELLER"
 	}
 
 	now := time.Now()
-	_, err = s.DB.ExecContext(ctx, `
+	if _, err = tx.ExecContext(ctx, `
 		UPDATE otc_negotiations
 		SET amount = $1, price_per_stock = $2, settlement_date = $3, premium = $4,
 		    last_modified = $5, modified_by_id = $6, modified_by_type = $7, status = $8
@@ -238,26 +255,38 @@ func (s *OtcServer) CounterOffer(ctx context.Context, req *pb.CounterOfferReques
 		req.Amount, req.PricePerStock, req.SettlementDate, req.Premium,
 		now, req.CallerId, req.CallerType, newStatus,
 		req.NegotiationId,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update negotiation: %v", err)
 	}
 
+	if err = tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit counter offer: %v", err)
+	}
 	return s.fetchNegotiationByID(ctx, req.NegotiationId)
 }
 
 func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotiationRequest) (*pb.NegotiationResponse, error) {
+	// Lock the negotiation row to prevent concurrent accept/counter/reject.
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var sellerID, buyerID int64
 	var sellerType, buyerType, currentStatus string
 	var ticker, currency string
 	var amount int32
 	var premium float64
-	err := s.DB.QueryRowContext(ctx, `
+	var settlementDate string
+	var strikePrice float64
+	err = tx.QueryRowContext(ctx, `
 		SELECT seller_id, seller_type, buyer_id, buyer_type, status,
-		       ticker, amount, premium, currency
-		FROM otc_negotiations WHERE id = $1`, req.NegotiationId,
+		       ticker, amount, premium, currency,
+		       settlement_date::text, price_per_stock
+		FROM otc_negotiations WHERE id = $1 FOR UPDATE`, req.NegotiationId,
 	).Scan(&sellerID, &sellerType, &buyerID, &buyerType, &currentStatus,
-		&ticker, &amount, &premium, &currency)
+		&ticker, &amount, &premium, &currency, &settlementDate, &strikePrice)
 	if err == sql.ErrNoRows {
 		return nil, status.Error(codes.NotFound, "negotiation not found")
 	} else if err != nil {
@@ -269,7 +298,6 @@ func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotia
 	if !isSeller && !isBuyer {
 		return nil, status.Error(codes.PermissionDenied, "caller is not a participant in this negotiation")
 	}
-
 	if currentStatus == "PENDING_SELLER" && !isSeller {
 		return nil, status.Error(codes.AlreadyExists, "not your turn: waiting for seller")
 	}
@@ -285,24 +313,23 @@ func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotia
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to resolve ticker: %v", err)
 	}
-
 	var portfolioAmount int64
 	portfolioErr := s.PortfolioDB.QueryRowContext(ctx, `
-		SELECT COALESCE(amount, 0) FROM portfolio_entry
+		SELECT COALESCE(amount - reserved_amount, 0) FROM portfolio_entry
 		WHERE user_id = $1 AND user_type = $2 AND listing_id = $3`,
 		portfolioUserID(sellerID, sellerType), sellerType, listingID,
 	).Scan(&portfolioAmount)
 	if portfolioErr != nil && portfolioErr != sql.ErrNoRows {
 		return nil, status.Errorf(codes.Internal, "failed to check seller portfolio: %v", portfolioErr)
 	}
-
+	// Include active contracts already committed (reserved_amount tracks transient saga reservations,
+	// so we also check active contracts to prevent overselling across multiple accepted negotiations).
 	var activeContractsSum int64
-	_ = s.DB.QueryRowContext(ctx, `
+	_ = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(amount), 0) FROM otc_contracts
 		WHERE ticker = $1 AND seller_id = $2 AND seller_type = $3 AND status = 'ACTIVE'`,
 		ticker, sellerID, sellerType,
 	).Scan(&activeContractsSum)
-
 	if portfolioAmount < activeContractsSum+int64(amount) {
 		return nil, status.Error(codes.InvalidArgument, "Seller does not have enough free shares")
 	}
@@ -312,7 +339,6 @@ func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotia
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported currency: %s", currency)
 	}
-
 	buyerAccountID := req.BuyerAccountId
 	if buyerAccountID == 0 {
 		buyerAccountID, err = findAccount(s.AccountDB, portfolioUserID(buyerID, buyerType), currencyID)
@@ -320,7 +346,6 @@ func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotia
 			return nil, status.Errorf(codes.Internal, "failed to find buyer account: %v", err)
 		}
 	}
-
 	var buyerBalance float64
 	err = s.AccountDB.QueryRowContext(ctx,
 		`SELECT available_balance FROM accounts WHERE id = $1`, buyerAccountID,
@@ -338,48 +363,28 @@ func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotia
 		return nil, status.Errorf(codes.Internal, "failed to find seller account: %v", err)
 	}
 
-	// --- Atomic: deduct buyer premium, credit seller, create contract, accept negotiation ---
-	_, err = s.AccountDB.ExecContext(ctx,
+	// --- Deduct buyer premium (with retry compensation on failure) ---
+	if _, err = s.AccountDB.ExecContext(ctx,
 		`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
 		premium, buyerAccountID,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to deduct premium from buyer: %v", err)
 	}
 
-	_, err = s.AccountDB.ExecContext(ctx,
+	// --- Credit seller premium ---
+	if _, err = s.AccountDB.ExecContext(ctx,
 		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
 		premium, sellerAccountID,
-	)
-	if err != nil {
-		// compensate
-		_, _ = s.AccountDB.ExecContext(ctx,
+	); err != nil {
+		retryExec(s.AccountDB,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			premium, buyerAccountID,
-		)
+			premium, buyerAccountID)
 		return nil, status.Errorf(codes.Internal, "failed to credit premium to seller: %v", err)
 	}
 
+	// --- Create contract and mark negotiation ACCEPTED (inside OTC tx) ---
 	var contractID int64
-	var settlementDate string
-	var strikePrice float64
-	err = s.DB.QueryRowContext(ctx, `
-		SELECT settlement_date::text, price_per_stock FROM otc_negotiations WHERE id = $1`,
-		req.NegotiationId,
-	).Scan(&settlementDate, &strikePrice)
-	if err != nil {
-		_, _ = s.AccountDB.ExecContext(ctx,
-			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			premium, buyerAccountID,
-		)
-		_, _ = s.AccountDB.ExecContext(ctx,
-			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			premium, sellerAccountID,
-		)
-		return nil, status.Errorf(codes.Internal, "failed to reload negotiation details: %v", err)
-	}
-
-	err = s.DB.QueryRowContext(ctx, `
+	if err = tx.QueryRowContext(ctx, `
 		INSERT INTO otc_contracts
 			(negotiation_id, seller_id, seller_type, buyer_id, buyer_type,
 			 ticker, amount, strike_price, premium, currency, settlement_date)
@@ -387,39 +392,58 @@ func (s *OtcServer) AcceptNegotiation(ctx context.Context, req *pb.AcceptNegotia
 		RETURNING id`,
 		req.NegotiationId, sellerID, sellerType, buyerID, buyerType,
 		ticker, amount, strikePrice, premium, currency, settlementDate,
-	).Scan(&contractID)
-	if err != nil {
-		_, _ = s.AccountDB.ExecContext(ctx,
+	).Scan(&contractID); err != nil {
+		retryExec(s.AccountDB,
 			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
-			premium, buyerAccountID,
-		)
-		_, _ = s.AccountDB.ExecContext(ctx,
+			premium, buyerAccountID)
+		retryExec(s.AccountDB,
 			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
-			premium, sellerAccountID,
-		)
+			premium, sellerAccountID)
 		return nil, status.Errorf(codes.Internal, "failed to create contract: %v", err)
 	}
 
 	now := time.Now()
-	_, err = s.DB.ExecContext(ctx, `
+	if _, err = tx.ExecContext(ctx, `
 		UPDATE otc_negotiations
 		SET status = 'ACCEPTED', last_modified = $1, modified_by_id = $2, modified_by_type = $3
 		WHERE id = $4`,
 		now, req.CallerId, req.CallerType, req.NegotiationId,
-	)
-	if err != nil {
+	); err != nil {
+		retryExec(s.AccountDB,
+			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+			premium, buyerAccountID)
+		retryExec(s.AccountDB,
+			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
+			premium, sellerAccountID)
 		return nil, status.Errorf(codes.Internal, "failed to accept negotiation: %v", err)
 	}
 
+	if err = tx.Commit(); err != nil {
+		retryExec(s.AccountDB,
+			`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
+			premium, buyerAccountID)
+		retryExec(s.AccountDB,
+			`UPDATE accounts SET balance = balance - $1, available_balance = available_balance - $1 WHERE id = $2`,
+			premium, sellerAccountID)
+		return nil, status.Errorf(codes.Internal, "failed to commit accept: %v", err)
+	}
+
+	_ = contractID
 	return s.fetchNegotiationByID(ctx, req.NegotiationId)
 }
 
 func (s *OtcServer) RejectNegotiation(ctx context.Context, req *pb.RejectNegotiationRequest) (*pb.NegotiationResponse, error) {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var sellerID, buyerID int64
 	var sellerType, buyerType, currentStatus string
-	err := s.DB.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT seller_id, seller_type, buyer_id, buyer_type, status
-		FROM otc_negotiations WHERE id = $1`, req.NegotiationId,
+		FROM otc_negotiations WHERE id = $1 FOR UPDATE`, req.NegotiationId,
 	).Scan(&sellerID, &sellerType, &buyerID, &buyerType, &currentStatus)
 	if err == sql.ErrNoRows {
 		return nil, status.Error(codes.NotFound, "negotiation not found")
@@ -432,22 +456,23 @@ func (s *OtcServer) RejectNegotiation(ctx context.Context, req *pb.RejectNegotia
 	if !isSeller && !isBuyer {
 		return nil, status.Error(codes.PermissionDenied, "caller is not a participant in this negotiation")
 	}
-
 	if currentStatus == "ACCEPTED" || currentStatus == "REJECTED" {
 		return nil, status.Errorf(codes.FailedPrecondition, "negotiation is already in terminal state: %s", currentStatus)
 	}
 
 	now := time.Now()
-	_, err = s.DB.ExecContext(ctx, `
+	if _, err = tx.ExecContext(ctx, `
 		UPDATE otc_negotiations
 		SET status = 'REJECTED', last_modified = $1, modified_by_id = $2, modified_by_type = $3
 		WHERE id = $4`,
 		now, req.CallerId, req.CallerType, req.NegotiationId,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to reject negotiation: %v", err)
 	}
 
+	if err = tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit rejection: %v", err)
+	}
 	return s.fetchNegotiationByID(ctx, req.NegotiationId)
 }
 
@@ -507,16 +532,35 @@ func (s *OtcServer) calcContractProfit(ticker string, strikePrice float64, amoun
 }
 
 func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContractRequest) (*pb.ExerciseContractResponse, error) {
+	// Idempotency: if this contract was already successfully exercised, return immediately.
+	var lastStep int
+	var lastStepStatus string
+	if idErr := s.DB.QueryRowContext(ctx,
+		`SELECT step, status FROM otc_saga_log WHERE contract_id=$1 ORDER BY step DESC, id DESC LIMIT 1`,
+		req.ContractId,
+	).Scan(&lastStep, &lastStepStatus); idErr == nil && lastStep == 5 && lastStepStatus == "SUCCESS" {
+		return &pb.ExerciseContractResponse{
+			Status:     "EXERCISED",
+			ExecutedAt: time.Now().Format(time.RFC3339),
+		}, nil
+	}
+
+	// Lock the contract row to prevent concurrent exercises of the same contract.
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var sellerID, buyerID int64
 	var sellerType, buyerType, contractStatus, ticker, currency string
 	var amount int32
 	var strikePrice float64
 	var settlementDate time.Time
-
-	err := s.DB.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT seller_id, seller_type, buyer_id, buyer_type, status,
 		       ticker, amount, strike_price, currency, settlement_date
-		FROM otc_contracts WHERE id = $1`, req.ContractId,
+		FROM otc_contracts WHERE id = $1 FOR UPDATE`, req.ContractId,
 	).Scan(&sellerID, &sellerType, &buyerID, &buyerType, &contractStatus,
 		&ticker, &amount, &strikePrice, &currency, &settlementDate)
 	if err == sql.ErrNoRows {
@@ -554,38 +598,34 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		}
 	}
 
+	// sagaLog writes a saga step record. It uses a fresh 5-second background context so
+	// it never blocks the calling goroutine (and therefore never prevents defer tx.Rollback()
+	// from running) even when the request context has already been cancelled.
 	sagaLog := func(step int, stepStatus, errMsg string) {
-		_, _ = s.DB.Exec(
+		logCtx, logCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer logCancel()
+		_, _ = s.DB.ExecContext(logCtx,
 			`INSERT INTO otc_saga_log (contract_id, step, status, error_msg) VALUES ($1, $2, $3, $4)`,
 			req.ContractId, step, stepStatus, sql.NullString{String: errMsg, Valid: errMsg != ""},
 		)
 	}
 
-	// retryExec retries a DB exec up to 3 times with linear backoff.
-	// Uses db.Exec (not ExecContext) so compensations survive a cancelled request context.
-	retryExec := func(db *sql.DB, query string, args ...interface{}) {
-		for attempt := 1; attempt <= 3; attempt++ {
-			if _, execErr := db.Exec(query, args...); execErr == nil {
-				return
-			}
-			time.Sleep(time.Duration(attempt*100) * time.Millisecond)
-		}
-	}
+	sellerPortfolioID := portfolioUserID(sellerID, sellerType)
 
-	// Step 1: Reserve buyer funds (deduct available_balance)
-	var buyerAvail float64
-	if err = s.AccountDB.QueryRowContext(ctx,
-		`SELECT available_balance FROM accounts WHERE id = $1`, buyerAccountID,
-	).Scan(&buyerAvail); err != nil || buyerAvail < totalCost {
-		sagaLog(1, "FAILED", fmt.Sprintf("insufficient funds: have %.2f need %.2f", buyerAvail, totalCost))
-		return nil, status.Error(codes.InvalidArgument, "Insufficient funds")
-	}
-	if _, err = s.AccountDB.ExecContext(ctx,
-		`UPDATE accounts SET available_balance = available_balance - $1 WHERE id = $2`,
+	// Step 1: Reserve buyer funds (deduct available_balance).
+	// Also checks balance >= totalCost to ensure consistency between the two balance fields.
+	result, err := s.AccountDB.ExecContext(ctx,
+		`UPDATE accounts SET available_balance = available_balance - $1
+		 WHERE id = $2 AND available_balance >= $1 AND balance >= $1`,
 		totalCost, buyerAccountID,
-	); err != nil {
+	)
+	if err != nil {
 		sagaLog(1, "FAILED", err.Error())
 		return nil, status.Errorf(codes.Internal, "step 1 failed: %v", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		sagaLog(1, "FAILED", fmt.Sprintf("insufficient funds: need %.2f", totalCost))
+		return nil, status.Error(codes.InvalidArgument, "Insufficient funds")
 	}
 	sagaLog(1, "SUCCESS", "")
 
@@ -596,28 +636,36 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		sagaLog(1, "COMPENSATED", "")
 	}
 
-	// Step 2: Verify seller securities
-	sellerPortfolioID := portfolioUserID(sellerID, sellerType)
-	var sellerHolding int64
-	if err = s.PortfolioDB.QueryRowContext(ctx, `
-		SELECT COALESCE(amount, 0) FROM portfolio_entry
-		WHERE user_id = $1 AND user_type = $2 AND listing_id = $3`,
-		sellerPortfolioID, sellerType, listingID,
-	).Scan(&sellerHolding); err != nil && err != sql.ErrNoRows {
+	// Step 2: Reserve seller securities (actual write, not just read).
+	// Uses UPDATE with a conditional WHERE to atomically check-and-reserve free shares.
+	result2, err := s.PortfolioDB.ExecContext(ctx, `
+		UPDATE portfolio_entry
+		SET reserved_amount = reserved_amount + $1
+		WHERE user_id = $2 AND user_type = $3 AND listing_id = $4
+		  AND (amount - reserved_amount) >= $1`,
+		amount, sellerPortfolioID, sellerType, listingID,
+	)
+	if err != nil {
 		sagaLog(2, "FAILED", err.Error())
 		comp1()
 		return nil, status.Errorf(codes.Internal, "step 2 failed: %v", err)
 	}
-	if sellerHolding < int64(amount) {
-		sagaLog(2, "FAILED", "seller insufficient holdings")
+	if rows, _ := result2.RowsAffected(); rows == 0 {
+		sagaLog(2, "FAILED", "seller insufficient free holdings")
 		comp1()
-		return nil, status.Error(codes.InvalidArgument, "Seller does not have enough shares")
+		return nil, status.Error(codes.InvalidArgument, "Seller does not have enough free shares")
 	}
 	sagaLog(2, "SUCCESS", "")
 
-	comp2 := func() { sagaLog(2, "COMPENSATED", "") }
+	comp2 := func() {
+		retryExec(s.PortfolioDB,
+			`UPDATE portfolio_entry SET reserved_amount = GREATEST(0, reserved_amount - $1)
+			 WHERE user_id = $2 AND user_type = $3 AND listing_id = $4`,
+			amount, sellerPortfolioID, sellerType, listingID)
+		sagaLog(2, "COMPENSATED", "")
+	}
 
-	// Step 3: Transfer funds
+	// Step 3: Transfer funds (debit buyer balance, credit seller balance).
 	sellerAccountID, err := findAccount(s.AccountDB, portfolioUserID(sellerID, sellerType), currencyID)
 	if err != nil {
 		sagaLog(3, "FAILED", err.Error())
@@ -638,8 +686,7 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		`UPDATE accounts SET balance = balance + $1, available_balance = available_balance + $1 WHERE id = $2`,
 		totalCost, sellerAccountID,
 	); err != nil {
-		_, _ = s.AccountDB.ExecContext(ctx,
-			`UPDATE accounts SET balance = balance + $1 WHERE id = $2`, totalCost, buyerAccountID)
+		retryExec(s.AccountDB, `UPDATE accounts SET balance = balance + $1 WHERE id = $2`, totalCost, buyerAccountID)
 		sagaLog(3, "FAILED", err.Error())
 		comp2()
 		comp1()
@@ -653,12 +700,14 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		sagaLog(3, "COMPENSATED", "")
 	}
 
-	// Step 4: Transfer ownership
+	// Step 4: Transfer ownership.
+	// Clears reserved_amount alongside amount so the saga reservation is released as shares move.
 	if _, err = s.PortfolioDB.ExecContext(ctx, `
 		UPDATE portfolio_entry
-		SET amount = amount - $1,
-		    public_amount = GREATEST(0, LEAST(public_amount, amount - $1)),
-		    last_modified = NOW()
+		SET amount          = amount - $1,
+		    reserved_amount = GREATEST(0, reserved_amount - $1),
+		    public_amount   = GREATEST(0, LEAST(public_amount, amount - $1)),
+		    last_modified   = NOW()
 		WHERE user_id = $2 AND user_type = $3 AND listing_id = $4`,
 		amount, sellerPortfolioID, sellerType, listingID,
 	); err != nil {
@@ -682,8 +731,8 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		buyerPortfolioID, buyerType, listingID, amount, strikePrice, buyerAccountID,
 	); err != nil {
 		sagaLog(4, "FAILED", "buyer upsert failed: "+err.Error())
-		_, _ = s.PortfolioDB.ExecContext(ctx,
-			`UPDATE portfolio_entry SET amount = amount + $1, last_modified = NOW()
+		retryExec(s.PortfolioDB,
+			`UPDATE portfolio_entry SET amount = amount + $1, reserved_amount = reserved_amount + $1, last_modified = NOW()
 			 WHERE user_id = $2 AND user_type = $3 AND listing_id = $4`,
 			amount, sellerPortfolioID, sellerType, listingID,
 		)
@@ -697,7 +746,7 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 
 	comp4 := func() {
 		retryExec(s.PortfolioDB, `
-			UPDATE portfolio_entry SET amount = amount + $1, public_amount = public_amount + $1, last_modified = NOW()
+			UPDATE portfolio_entry SET amount = amount + $1, reserved_amount = reserved_amount + $1, public_amount = public_amount + $1, last_modified = NOW()
 			WHERE user_id=$2 AND user_type=$3 AND listing_id=$4`,
 			amount, sellerPortfolioID, sellerType, listingID)
 		retryExec(s.PortfolioDB, `
@@ -707,9 +756,24 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		sagaLog(4, "COMPENSATED", "")
 	}
 
-	// Step 5: Mark EXERCISED
+	// Step 5: Double-check final state, then atomically mark contract EXERCISED.
+	var buyerHolding int64
+	checkErr := s.PortfolioDB.QueryRowContext(ctx, `
+		SELECT COALESCE(amount, 0) FROM portfolio_entry
+		WHERE user_id = $1 AND user_type = $2 AND listing_id = $3`,
+		buyerPortfolioID, buyerType, listingID,
+	).Scan(&buyerHolding)
+	if checkErr != nil || buyerHolding < int64(amount) {
+		sagaLog(5, "FAILED", "double check failed: buyer portfolio inconsistent")
+		comp4()
+		comp3()
+		comp2()
+		comp1()
+		return nil, status.Error(codes.Internal, "step 5 double check failed, saga rolled back")
+	}
+
 	now := time.Now()
-	if _, err = s.DB.ExecContext(ctx,
+	if _, err = tx.ExecContext(ctx,
 		`UPDATE otc_contracts SET status = 'EXERCISED' WHERE id = $1`, req.ContractId,
 	); err != nil {
 		sagaLog(5, "FAILED", err.Error())
@@ -718,6 +782,14 @@ func (s *OtcServer) ExerciseContract(ctx context.Context, req *pb.ExerciseContra
 		comp2()
 		comp1()
 		return nil, status.Errorf(codes.Internal, "step 5 failed: %v", err)
+	}
+	if err = tx.Commit(); err != nil {
+		sagaLog(5, "FAILED", "commit failed: "+err.Error())
+		comp4()
+		comp3()
+		comp2()
+		comp1()
+		return nil, status.Errorf(codes.Internal, "step 5 commit failed: %v", err)
 	}
 	sagaLog(5, "SUCCESS", "")
 

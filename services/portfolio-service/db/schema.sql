@@ -8,7 +8,8 @@ CREATE TABLE portfolio_entry (
     last_modified TIMESTAMP     NOT NULL DEFAULT NOW(),
     is_public     BOOLEAN       NOT NULL DEFAULT FALSE,
     public_amount INT           NOT NULL DEFAULT 0,
-    account_id    BIGINT        NOT NULL,
+    account_id      BIGINT        NOT NULL,
+    reserved_amount INT           NOT NULL DEFAULT 0,
     UNIQUE(user_id, user_type, listing_id)
 );
 
