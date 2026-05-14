@@ -1833,6 +1833,7 @@ type ListingSummary struct {
 	StrikePrice    float64 `protobuf:"fixed64,15,opt,name=strike_price,json=strikePrice,proto3" json:"strike_price,omitempty"`
 	SettlementDate string  `protobuf:"bytes,16,opt,name=settlement_date,json=settlementDate,proto3" json:"settlement_date,omitempty"` // "YYYY-MM-DD"
 	OpenInterest   int64   `protobuf:"varint,17,opt,name=open_interest,json=openInterest,proto3" json:"open_interest,omitempty"`
+	Currency       string  `protobuf:"bytes,18,opt,name=currency,proto3" json:"currency,omitempty"` // ISO currency code of the listing's exchange (e.g. "USD")
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1984,6 +1985,13 @@ func (x *ListingSummary) GetOpenInterest() int64 {
 		return x.OpenInterest
 	}
 	return 0
+}
+
+func (x *ListingSummary) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
 }
 
 type GetListingsResponse struct {
@@ -2795,7 +2803,7 @@ const file_securities_proto_rawDesc = "" +
 	"\tpage_size\x18\x06 \x01(\x05R\bpageSize\x12\x17\n" +
 	"\asort_by\x18\a \x01(\tR\x06sortBy\x12\x1d\n" +
 	"\n" +
-	"sort_order\x18\b \x01(\tR\tsortOrder\"\x9a\x04\n" +
+	"sort_order\x18\b \x01(\tR\tsortOrder\"\xb6\x04\n" +
 	"\x0eListingSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x16\n" +
 	"\x06ticker\x18\x02 \x01(\tR\x06ticker\x12\x12\n" +
@@ -2815,7 +2823,8 @@ const file_securities_proto_rawDesc = "" +
 	"optionType\x12!\n" +
 	"\fstrike_price\x18\x0f \x01(\x01R\vstrikePrice\x12'\n" +
 	"\x0fsettlement_date\x18\x10 \x01(\tR\x0esettlementDate\x12#\n" +
-	"\ropen_interest\x18\x11 \x01(\x03R\fopenInterest\"\x95\x01\n" +
+	"\ropen_interest\x18\x11 \x01(\x03R\fopenInterest\x12\x1a\n" +
+	"\bcurrency\x18\x12 \x01(\tR\bcurrency\"\x95\x01\n" +
 	"\x13GetListingsResponse\x126\n" +
 	"\blistings\x18\x01 \x03(\v2\x1a.securities.ListingSummaryR\blistings\x12\x1f\n" +
 	"\vtotal_pages\x18\x02 \x01(\x05R\n" +

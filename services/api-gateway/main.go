@@ -268,7 +268,7 @@ func main() {
 	r.POST("/investment/funds/:id/invest", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.InvestFund(fundClient))
 	r.POST("/investment/funds/:id/withdraw", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.WithdrawFund(fundClient))
 	r.GET("/client/funds/positions", middleware.RequireRole("CLIENT"), handlers.GetMyPositions(fundClient))
-	r.POST("/investment/funds/:id/securities/buy", middleware.RequireRole("SUPERVISOR"), handlers.BuyFundSecurities(fundClient, securitiesClient, orderClient))
+	r.POST("/investment/funds/:id/securities/buy", middleware.RequireRole("SUPERVISOR"), handlers.BuyFundSecurities(fundClient, securitiesClient, orderClient, exchangeClient))
 	r.POST("/investment/funds/:id/securities/sell", middleware.RequireRole("SUPERVISOR"), handlers.SellFundSecurities(fundClient, securitiesClient, orderClient))
 	r.GET("/investment/funds/:id/securities", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFundSecurities(fundClient, securitiesClient))
 	r.GET("/investment/funds/:id/performance", middleware.RequireRole("CLIENT", "AGENT", "SUPERVISOR"), handlers.GetFundPerformanceHistory(fundClient))

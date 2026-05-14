@@ -12,6 +12,7 @@ import (
 	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
+	pb_securities "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -64,6 +65,13 @@ func main() {
 	defer func() { _ = exchangeConn.Close() }()
 	exchangeClient := pb_exchange.NewExchangeServiceClient(exchangeConn)
 
+	securitiesConn, err := grpc.NewClient(os.Getenv("SECURITIES_SERVICE_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to securities-service: %v", err)
+	}
+	defer func() { _ = securitiesConn.Close() }()
+	securitiesClient := pb_securities.NewSecuritiesServiceClient(securitiesConn)
+
 	lis, err := net.Listen("tcp", grpcPort)
 	if err != nil {
 		log.Fatalf("failed to listen on %s: %v", grpcPort, err)
@@ -71,16 +79,17 @@ func main() {
 
 	srv := grpc.NewServer()
 	pb.RegisterFundServiceServer(srv, &handlers.FundServer{
-		DB:             fundDB,
-		AccountDB:      accountDB,
-		EmployeeDB:     employeeDB,
-		ExchangeDB:     exchangeDB,
-		AccountClient:  accountClient,
-		OrderClient:    orderClient,
-		ExchangeClient: exchangeClient,
+		DB:               fundDB,
+		AccountDB:        accountDB,
+		EmployeeDB:       employeeDB,
+		ExchangeDB:       exchangeDB,
+		AccountClient:    accountClient,
+		OrderClient:      orderClient,
+		ExchangeClient:   exchangeClient,
+		SecuritiesClient: securitiesClient,
 	})
 
-	sched := &scheduler.PerformanceScheduler{DB: fundDB}
+	sched := &scheduler.PerformanceScheduler{DB: fundDB, SecuritiesClient: securitiesClient, ExchangeClient: exchangeClient}
 	sched.Start()
 
 	log.Printf("fund-service gRPC server listening on %s", grpcPort)

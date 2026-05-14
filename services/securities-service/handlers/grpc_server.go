@@ -511,7 +511,7 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 	totalPages := int32((total + int64(pageSize) - 1) / int64(pageSize))
 
 	query := fmt.Sprintf(`
-		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym,
+		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym, se.currency,
 		       l.price, l.ask, l.bid, l.volume, l.change,
 		       COALESCE(ls.outstanding_shares, 0),
 		       COALESCE(lfc.contract_size, 1),
@@ -532,23 +532,23 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 	var listings []*pb.ListingSummary
 	for rows.Next() {
 		var (
-			id              int64
-			ticker, name    string
-			lType, acronym  string
-			price, ask, bid float64
-			volume          int64
-			change          float64
-			outshares       int64
-			contractSize    float64
-			stockListingID  sql.NullInt64
-			stockPrice      float64
-			optionType      sql.NullString
-			strikePrice     sql.NullFloat64
-			settlementDate  sql.NullTime
-			openInterest    sql.NullInt64
+			id                     int64
+			ticker, name           string
+			lType, acronym, curr   string
+			price, ask, bid        float64
+			volume                 int64
+			change                 float64
+			outshares              int64
+			contractSize           float64
+			stockListingID         sql.NullInt64
+			stockPrice             float64
+			optionType             sql.NullString
+			strikePrice            sql.NullFloat64
+			settlementDate         sql.NullTime
+			openInterest           sql.NullInt64
 		)
 		if err := rows.Scan(
-			&id, &ticker, &name, &lType, &acronym,
+			&id, &ticker, &name, &lType, &acronym, &curr,
 			&price, &ask, &bid, &volume, &change,
 			&outshares, &contractSize, &stockListingID, &stockPrice,
 			&optionType, &strikePrice, &settlementDate, &openInterest,
@@ -563,6 +563,7 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 			Name:              name,
 			Type:              lType,
 			ExchangeAcronym:   acronym,
+			Currency:          curr,
 			Price:             price,
 			Ask:               ask,
 			Bid:               bid,
@@ -595,8 +596,8 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 	}
 
 	var (
-		id                           int64
-		ticker, name, lType, acronym string
+		id                                int64
+		ticker, name, lType, acronym, curr string
 		price, ask, bid              float64
 		volume                       int64
 		change                       float64
@@ -618,7 +619,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		optionSettlement sql.NullTime
 	)
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym,
+		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym, se.currency,
 		       l.price, l.ask, l.bid, l.volume, l.change,
 		       ls.outstanding_shares, ls.dividend_yield,
 		       lfp.base_currency, lfp.quote_currency, lfp.liquidity::text,
@@ -632,7 +633,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		LEFT JOIN listing_futures_contract lfc ON l.id = lfc.listing_id
 		LEFT JOIN listing_option lo ON l.id = lo.listing_id
 		WHERE l.id = $1`, req.Id).Scan(
-		&id, &ticker, &name, &lType, &acronym,
+		&id, &ticker, &name, &lType, &acronym, &curr,
 		&price, &ask, &bid, &volume, &change,
 		&outshares, &dividendYield,
 		&baseCurrency, &quoteCurrency, &liquidity,
@@ -666,6 +667,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		Name:              name,
 		Type:              lType,
 		ExchangeAcronym:   acronym,
+		Currency:          curr,
 		Price:             price,
 		Ask:               ask,
 		Bid:               bid,

@@ -10,19 +10,21 @@ import (
 	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
+	pb_securities "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type FundServer struct {
 	pb.UnimplementedFundServiceServer
-	DB             *sql.DB // fund_db
-	AccountDB      *sql.DB // account_db
-	EmployeeDB     *sql.DB // employee_db
-	ExchangeDB     *sql.DB // exchange_db (currency code lookup)
-	AccountClient  pb_account.AccountServiceClient
-	OrderClient    pb_order.OrderServiceClient
-	ExchangeClient pb_exchange.ExchangeServiceClient
+	DB               *sql.DB // fund_db
+	AccountDB        *sql.DB // account_db
+	EmployeeDB       *sql.DB // employee_db
+	ExchangeDB       *sql.DB // exchange_db (currency code lookup)
+	AccountClient    pb_account.AccountServiceClient
+	OrderClient      pb_order.OrderServiceClient
+	ExchangeClient   pb_exchange.ExchangeServiceClient
+	SecuritiesClient pb_securities.SecuritiesServiceClient
 }
 
 func (s *FundServer) Ping(_ context.Context, _ *pb.PingRequest) (*pb.PingResponse, error) {
@@ -207,8 +209,26 @@ func (s *FundServer) fetchFundByID(ctx context.Context, id int64, includeAccount
 	}
 	f.CreatedAt = createdAt.Format(time.RFC3339)
 
-	// fund_value = liquid_assets (no portfolio positions in Sprint 1)
-	f.FundValue = f.LiquidAssets
+	portfolioRows, pErr := s.DB.QueryContext(ctx,
+		`SELECT listing_id, quantity FROM fund_portfolio_positions WHERE fund_id = $1 AND quantity > 0`, id)
+	var portfolioValue float64
+	if pErr == nil {
+		defer portfolioRows.Close()
+		for portfolioRows.Next() {
+			var listingID int64
+			var qty float64
+			if err := portfolioRows.Scan(&listingID, &qty); err != nil {
+				continue
+			}
+			resp, err := s.SecuritiesClient.GetListingById(ctx, &pb_securities.GetListingByIdRequest{Id: listingID})
+			if err != nil || resp.Summary == nil {
+				continue
+			}
+			priceRSD := s.convertViaExchange(ctx, resp.Summary.Currency, "RSD", resp.Summary.Price)
+			portfolioValue += qty * priceRSD
+		}
+	}
+	f.FundValue = f.LiquidAssets + portfolioValue
 
 	// profit = fund_value - total invested
 	var totalInvested float64

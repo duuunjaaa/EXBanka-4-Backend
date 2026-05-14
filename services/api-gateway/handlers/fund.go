@@ -10,6 +10,7 @@ import (
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fund"
 	pb_order "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/order"
 	pb_sec "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
+	pb_exchange "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -523,7 +524,22 @@ func GetFundSecurities(fundClient pb.FundServiceClient, secClient pb_sec.Securit
 	}
 }
 
-func BuyFundSecurities(fundClient pb.FundServiceClient, secClient pb_sec.SecuritiesServiceClient, orderClient pb_order.OrderServiceClient) gin.HandlerFunc {
+func priceToRSD(ctx context.Context, exchangeClient pb_exchange.ExchangeServiceClient, currency string, price float64) float64 {
+	if currency == "" || currency == "RSD" || exchangeClient == nil {
+		return price
+	}
+	resp, err := exchangeClient.PreviewConversion(ctx, &pb_exchange.PreviewConversionRequest{
+		FromCurrency: currency,
+		ToCurrency:   "RSD",
+		Amount:       price,
+	})
+	if err != nil {
+		return price
+	}
+	return resp.ToAmount
+}
+
+func BuyFundSecurities(fundClient pb.FundServiceClient, secClient pb_sec.SecuritiesServiceClient, orderClient pb_order.OrderServiceClient, exchangeClient pb_exchange.ExchangeServiceClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
@@ -555,7 +571,8 @@ func BuyFundSecurities(fundClient pb.FundServiceClient, secClient pb_sec.Securit
 		}
 		listing := secResp.Listings[0]
 
-		requiredAmount := float64(body.Amount) * listing.Price
+		priceRSD := priceToRSD(ctx, exchangeClient, listing.Currency, listing.Price)
+		requiredAmount := float64(body.Amount) * priceRSD
 		var accountID int64
 
 		if middleware.CallerHasPermission(c, "ADMIN") {
