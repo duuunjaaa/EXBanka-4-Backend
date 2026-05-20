@@ -29,6 +29,9 @@ const (
 	PaymentService_DeletePaymentRecipient_FullMethodName   = "/payment.PaymentService/DeletePaymentRecipient"
 	PaymentService_ReorderPaymentRecipients_FullMethodName = "/payment.PaymentService/ReorderPaymentRecipients"
 	PaymentService_GetTransfers_FullMethodName             = "/payment.PaymentService/GetTransfers"
+	PaymentService_PrepareInterbankPayment_FullMethodName  = "/payment.PaymentService/PrepareInterbankPayment"
+	PaymentService_CommitInterbankPayment_FullMethodName   = "/payment.PaymentService/CommitInterbankPayment"
+	PaymentService_RollbackInterbankPayment_FullMethodName = "/payment.PaymentService/RollbackInterbankPayment"
 )
 
 // PaymentServiceClient is the client API for PaymentService service.
@@ -45,6 +48,9 @@ type PaymentServiceClient interface {
 	DeletePaymentRecipient(ctx context.Context, in *DeletePaymentRecipientRequest, opts ...grpc.CallOption) (*DeletePaymentRecipientResponse, error)
 	ReorderPaymentRecipients(ctx context.Context, in *ReorderPaymentRecipientsRequest, opts ...grpc.CallOption) (*ReorderPaymentRecipientsResponse, error)
 	GetTransfers(ctx context.Context, in *GetTransfersRequest, opts ...grpc.CallOption) (*GetTransfersResponse, error)
+	PrepareInterbankPayment(ctx context.Context, in *PrepareInterbankPaymentRequest, opts ...grpc.CallOption) (*PrepareInterbankPaymentResponse, error)
+	CommitInterbankPayment(ctx context.Context, in *CommitRollbackInterbankRequest, opts ...grpc.CallOption) (*CommitRollbackInterbankResponse, error)
+	RollbackInterbankPayment(ctx context.Context, in *CommitRollbackInterbankRequest, opts ...grpc.CallOption) (*CommitRollbackInterbankResponse, error)
 }
 
 type paymentServiceClient struct {
@@ -155,6 +161,36 @@ func (c *paymentServiceClient) GetTransfers(ctx context.Context, in *GetTransfer
 	return out, nil
 }
 
+func (c *paymentServiceClient) PrepareInterbankPayment(ctx context.Context, in *PrepareInterbankPaymentRequest, opts ...grpc.CallOption) (*PrepareInterbankPaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PrepareInterbankPaymentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_PrepareInterbankPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) CommitInterbankPayment(ctx context.Context, in *CommitRollbackInterbankRequest, opts ...grpc.CallOption) (*CommitRollbackInterbankResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitRollbackInterbankResponse)
+	err := c.cc.Invoke(ctx, PaymentService_CommitInterbankPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) RollbackInterbankPayment(ctx context.Context, in *CommitRollbackInterbankRequest, opts ...grpc.CallOption) (*CommitRollbackInterbankResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitRollbackInterbankResponse)
+	err := c.cc.Invoke(ctx, PaymentService_RollbackInterbankPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PaymentServiceServer is the server API for PaymentService service.
 // All implementations must embed UnimplementedPaymentServiceServer
 // for forward compatibility.
@@ -169,6 +205,9 @@ type PaymentServiceServer interface {
 	DeletePaymentRecipient(context.Context, *DeletePaymentRecipientRequest) (*DeletePaymentRecipientResponse, error)
 	ReorderPaymentRecipients(context.Context, *ReorderPaymentRecipientsRequest) (*ReorderPaymentRecipientsResponse, error)
 	GetTransfers(context.Context, *GetTransfersRequest) (*GetTransfersResponse, error)
+	PrepareInterbankPayment(context.Context, *PrepareInterbankPaymentRequest) (*PrepareInterbankPaymentResponse, error)
+	CommitInterbankPayment(context.Context, *CommitRollbackInterbankRequest) (*CommitRollbackInterbankResponse, error)
+	RollbackInterbankPayment(context.Context, *CommitRollbackInterbankRequest) (*CommitRollbackInterbankResponse, error)
 	mustEmbedUnimplementedPaymentServiceServer()
 }
 
@@ -208,6 +247,15 @@ func (UnimplementedPaymentServiceServer) ReorderPaymentRecipients(context.Contex
 }
 func (UnimplementedPaymentServiceServer) GetTransfers(context.Context, *GetTransfersRequest) (*GetTransfersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTransfers not implemented")
+}
+func (UnimplementedPaymentServiceServer) PrepareInterbankPayment(context.Context, *PrepareInterbankPaymentRequest) (*PrepareInterbankPaymentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PrepareInterbankPayment not implemented")
+}
+func (UnimplementedPaymentServiceServer) CommitInterbankPayment(context.Context, *CommitRollbackInterbankRequest) (*CommitRollbackInterbankResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitInterbankPayment not implemented")
+}
+func (UnimplementedPaymentServiceServer) RollbackInterbankPayment(context.Context, *CommitRollbackInterbankRequest) (*CommitRollbackInterbankResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RollbackInterbankPayment not implemented")
 }
 func (UnimplementedPaymentServiceServer) mustEmbedUnimplementedPaymentServiceServer() {}
 func (UnimplementedPaymentServiceServer) testEmbeddedByValue()                        {}
@@ -410,6 +458,60 @@ func _PaymentService_GetTransfers_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PaymentService_PrepareInterbankPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrepareInterbankPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).PrepareInterbankPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_PrepareInterbankPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).PrepareInterbankPayment(ctx, req.(*PrepareInterbankPaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_CommitInterbankPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitRollbackInterbankRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).CommitInterbankPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_CommitInterbankPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).CommitInterbankPayment(ctx, req.(*CommitRollbackInterbankRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_RollbackInterbankPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitRollbackInterbankRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).RollbackInterbankPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_RollbackInterbankPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).RollbackInterbankPayment(ctx, req.(*CommitRollbackInterbankRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PaymentService_ServiceDesc is the grpc.ServiceDesc for PaymentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -456,6 +558,18 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTransfers",
 			Handler:    _PaymentService_GetTransfers_Handler,
+		},
+		{
+			MethodName: "PrepareInterbankPayment",
+			Handler:    _PaymentService_PrepareInterbankPayment_Handler,
+		},
+		{
+			MethodName: "CommitInterbankPayment",
+			Handler:    _PaymentService_CommitInterbankPayment_Handler,
+		},
+		{
+			MethodName: "RollbackInterbankPayment",
+			Handler:    _PaymentService_RollbackInterbankPayment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
