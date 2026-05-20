@@ -408,6 +408,31 @@ func (s *EmployeeServer) GetActuaries(ctx context.Context, req *pb.GetActuariesR
 	return &pb.GetActuariesResponse{Actuaries: actuaries}, nil
 }
 
+func (s *EmployeeServer) GetSupervisors(ctx context.Context, _ *pb.GetSupervisorsRequest) (*pb.GetSupervisorsResponse, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT id, first_name, last_name, email, position
+		FROM employees
+		WHERE 'SUPERVISOR' = ANY(permissions) AND active = true
+		ORDER BY last_name, first_name`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var supervisors []*pb.SupervisorInfo
+	for rows.Next() {
+		var s pb.SupervisorInfo
+		if err := rows.Scan(&s.EmployeeId, &s.FirstName, &s.LastName, &s.Email, &s.Position); err != nil {
+			return nil, err
+		}
+		supervisors = append(supervisors, &s)
+	}
+	if supervisors == nil {
+		supervisors = []*pb.SupervisorInfo{}
+	}
+	return &pb.GetSupervisorsResponse{Supervisors: supervisors}, nil
+}
+
 func (s *EmployeeServer) SetAgentLimit(ctx context.Context, req *pb.SetAgentLimitRequest) (*pb.SetAgentLimitResponse, error) {
 	if req.LimitAmount < 0 {
 		return nil, status.Error(codes.InvalidArgument, "limit must be non-negative")

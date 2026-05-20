@@ -757,6 +757,154 @@ func (x *WithdrawFundRequest) GetAmount() float64 {
 	return 0
 }
 
+type WithdrawFundResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pending       bool                   `protobuf:"varint,1,opt,name=pending,proto3" json:"pending,omitempty"` // true → 202 Accepted; false → 200 OK
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Fund          *FundResponse          `protobuf:"bytes,3,opt,name=fund,proto3" json:"fund,omitempty"` // populated when pending=false
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WithdrawFundResponse) Reset() {
+	*x = WithdrawFundResponse{}
+	mi := &file_fund_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawFundResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawFundResponse) ProtoMessage() {}
+
+func (x *WithdrawFundResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawFundResponse.ProtoReflect.Descriptor instead.
+func (*WithdrawFundResponse) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *WithdrawFundResponse) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
+func (x *WithdrawFundResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *WithdrawFundResponse) GetFund() *FundResponse {
+	if x != nil {
+		return x.Fund
+	}
+	return nil
+}
+
+type CheckPendingWithdrawalsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FundId        int64                  `protobuf:"varint,1,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPendingWithdrawalsRequest) Reset() {
+	*x = CheckPendingWithdrawalsRequest{}
+	mi := &file_fund_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPendingWithdrawalsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPendingWithdrawalsRequest) ProtoMessage() {}
+
+func (x *CheckPendingWithdrawalsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPendingWithdrawalsRequest.ProtoReflect.Descriptor instead.
+func (*CheckPendingWithdrawalsRequest) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CheckPendingWithdrawalsRequest) GetFundId() int64 {
+	if x != nil {
+		return x.FundId
+	}
+	return 0
+}
+
+type CheckPendingWithdrawalsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Completed     int64                  `protobuf:"varint,1,opt,name=completed,proto3" json:"completed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPendingWithdrawalsResponse) Reset() {
+	*x = CheckPendingWithdrawalsResponse{}
+	mi := &file_fund_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPendingWithdrawalsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPendingWithdrawalsResponse) ProtoMessage() {}
+
+func (x *CheckPendingWithdrawalsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPendingWithdrawalsResponse.ProtoReflect.Descriptor instead.
+func (*CheckPendingWithdrawalsResponse) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CheckPendingWithdrawalsResponse) GetCompleted() int64 {
+	if x != nil {
+		return x.Completed
+	}
+	return 0
+}
+
 type BankFundPosition struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	FundId           int64                  `protobuf:"varint,1,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
@@ -771,7 +919,7 @@ type BankFundPosition struct {
 
 func (x *BankFundPosition) Reset() {
 	*x = BankFundPosition{}
-	mi := &file_fund_proto_msgTypes[12]
+	mi := &file_fund_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -783,7 +931,7 @@ func (x *BankFundPosition) String() string {
 func (*BankFundPosition) ProtoMessage() {}
 
 func (x *BankFundPosition) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[12]
+	mi := &file_fund_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -796,7 +944,7 @@ func (x *BankFundPosition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BankFundPosition.ProtoReflect.Descriptor instead.
 func (*BankFundPosition) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{12}
+	return file_fund_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *BankFundPosition) GetFundId() int64 {
@@ -849,7 +997,7 @@ type GetBankPositionsRequest struct {
 
 func (x *GetBankPositionsRequest) Reset() {
 	*x = GetBankPositionsRequest{}
-	mi := &file_fund_proto_msgTypes[13]
+	mi := &file_fund_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -861,7 +1009,7 @@ func (x *GetBankPositionsRequest) String() string {
 func (*GetBankPositionsRequest) ProtoMessage() {}
 
 func (x *GetBankPositionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[13]
+	mi := &file_fund_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -874,7 +1022,7 @@ func (x *GetBankPositionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBankPositionsRequest.ProtoReflect.Descriptor instead.
 func (*GetBankPositionsRequest) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{13}
+	return file_fund_proto_rawDescGZIP(), []int{16}
 }
 
 type GetBankPositionsResponse struct {
@@ -886,7 +1034,7 @@ type GetBankPositionsResponse struct {
 
 func (x *GetBankPositionsResponse) Reset() {
 	*x = GetBankPositionsResponse{}
-	mi := &file_fund_proto_msgTypes[14]
+	mi := &file_fund_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -898,7 +1046,7 @@ func (x *GetBankPositionsResponse) String() string {
 func (*GetBankPositionsResponse) ProtoMessage() {}
 
 func (x *GetBankPositionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[14]
+	mi := &file_fund_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -911,7 +1059,7 @@ func (x *GetBankPositionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBankPositionsResponse.ProtoReflect.Descriptor instead.
 func (*GetBankPositionsResponse) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{14}
+	return file_fund_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetBankPositionsResponse) GetPositions() []*BankFundPosition {
@@ -919,6 +1067,306 @@ func (x *GetBankPositionsResponse) GetPositions() []*BankFundPosition {
 		return x.Positions
 	}
 	return nil
+}
+
+type ClientFundPosition struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	FundId               int64                  `protobuf:"varint,1,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
+	FundName             string                 `protobuf:"bytes,2,opt,name=fund_name,json=fundName,proto3" json:"fund_name,omitempty"`
+	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	FundValue            float64                `protobuf:"fixed64,4,opt,name=fund_value,json=fundValue,proto3" json:"fund_value,omitempty"`
+	FundPercentage       float64                `protobuf:"fixed64,5,opt,name=fund_percentage,json=fundPercentage,proto3" json:"fund_percentage,omitempty"`
+	CurrentPositionValue float64                `protobuf:"fixed64,6,opt,name=current_position_value,json=currentPositionValue,proto3" json:"current_position_value,omitempty"`
+	TotalInvestedAmount  float64                `protobuf:"fixed64,7,opt,name=total_invested_amount,json=totalInvestedAmount,proto3" json:"total_invested_amount,omitempty"`
+	Profit               float64                `protobuf:"fixed64,8,opt,name=profit,proto3" json:"profit,omitempty"`
+	MinimumContribution  float64                `protobuf:"fixed64,9,opt,name=minimum_contribution,json=minimumContribution,proto3" json:"minimum_contribution,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ClientFundPosition) Reset() {
+	*x = ClientFundPosition{}
+	mi := &file_fund_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientFundPosition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientFundPosition) ProtoMessage() {}
+
+func (x *ClientFundPosition) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientFundPosition.ProtoReflect.Descriptor instead.
+func (*ClientFundPosition) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ClientFundPosition) GetFundId() int64 {
+	if x != nil {
+		return x.FundId
+	}
+	return 0
+}
+
+func (x *ClientFundPosition) GetFundName() string {
+	if x != nil {
+		return x.FundName
+	}
+	return ""
+}
+
+func (x *ClientFundPosition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ClientFundPosition) GetFundValue() float64 {
+	if x != nil {
+		return x.FundValue
+	}
+	return 0
+}
+
+func (x *ClientFundPosition) GetFundPercentage() float64 {
+	if x != nil {
+		return x.FundPercentage
+	}
+	return 0
+}
+
+func (x *ClientFundPosition) GetCurrentPositionValue() float64 {
+	if x != nil {
+		return x.CurrentPositionValue
+	}
+	return 0
+}
+
+func (x *ClientFundPosition) GetTotalInvestedAmount() float64 {
+	if x != nil {
+		return x.TotalInvestedAmount
+	}
+	return 0
+}
+
+func (x *ClientFundPosition) GetProfit() float64 {
+	if x != nil {
+		return x.Profit
+	}
+	return 0
+}
+
+func (x *ClientFundPosition) GetMinimumContribution() float64 {
+	if x != nil {
+		return x.MinimumContribution
+	}
+	return 0
+}
+
+type GetMyPositionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      int64                  `protobuf:"varint,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ClientType    string                 `protobuf:"bytes,2,opt,name=client_type,json=clientType,proto3" json:"client_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyPositionsRequest) Reset() {
+	*x = GetMyPositionsRequest{}
+	mi := &file_fund_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyPositionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyPositionsRequest) ProtoMessage() {}
+
+func (x *GetMyPositionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyPositionsRequest.ProtoReflect.Descriptor instead.
+func (*GetMyPositionsRequest) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetMyPositionsRequest) GetClientId() int64 {
+	if x != nil {
+		return x.ClientId
+	}
+	return 0
+}
+
+func (x *GetMyPositionsRequest) GetClientType() string {
+	if x != nil {
+		return x.ClientType
+	}
+	return ""
+}
+
+type GetMyPositionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Positions     []*ClientFundPosition  `protobuf:"bytes,1,rep,name=positions,proto3" json:"positions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyPositionsResponse) Reset() {
+	*x = GetMyPositionsResponse{}
+	mi := &file_fund_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyPositionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyPositionsResponse) ProtoMessage() {}
+
+func (x *GetMyPositionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyPositionsResponse.ProtoReflect.Descriptor instead.
+func (*GetMyPositionsResponse) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetMyPositionsResponse) GetPositions() []*ClientFundPosition {
+	if x != nil {
+		return x.Positions
+	}
+	return nil
+}
+
+type TransferFundsByManagerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OldManagerId  int64                  `protobuf:"varint,1,opt,name=old_manager_id,json=oldManagerId,proto3" json:"old_manager_id,omitempty"`
+	NewManagerId  int64                  `protobuf:"varint,2,opt,name=new_manager_id,json=newManagerId,proto3" json:"new_manager_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransferFundsByManagerRequest) Reset() {
+	*x = TransferFundsByManagerRequest{}
+	mi := &file_fund_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferFundsByManagerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferFundsByManagerRequest) ProtoMessage() {}
+
+func (x *TransferFundsByManagerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferFundsByManagerRequest.ProtoReflect.Descriptor instead.
+func (*TransferFundsByManagerRequest) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *TransferFundsByManagerRequest) GetOldManagerId() int64 {
+	if x != nil {
+		return x.OldManagerId
+	}
+	return 0
+}
+
+func (x *TransferFundsByManagerRequest) GetNewManagerId() int64 {
+	if x != nil {
+		return x.NewManagerId
+	}
+	return 0
+}
+
+type TransferFundsByManagerResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	FundsTransferred int64                  `protobuf:"varint,1,opt,name=funds_transferred,json=fundsTransferred,proto3" json:"funds_transferred,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *TransferFundsByManagerResponse) Reset() {
+	*x = TransferFundsByManagerResponse{}
+	mi := &file_fund_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferFundsByManagerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferFundsByManagerResponse) ProtoMessage() {}
+
+func (x *TransferFundsByManagerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferFundsByManagerResponse.ProtoReflect.Descriptor instead.
+func (*TransferFundsByManagerResponse) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *TransferFundsByManagerResponse) GetFundsTransferred() int64 {
+	if x != nil {
+		return x.FundsTransferred
+	}
+	return 0
 }
 
 type ValidateFundAccountRequest struct {
@@ -932,7 +1380,7 @@ type ValidateFundAccountRequest struct {
 
 func (x *ValidateFundAccountRequest) Reset() {
 	*x = ValidateFundAccountRequest{}
-	mi := &file_fund_proto_msgTypes[15]
+	mi := &file_fund_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -944,7 +1392,7 @@ func (x *ValidateFundAccountRequest) String() string {
 func (*ValidateFundAccountRequest) ProtoMessage() {}
 
 func (x *ValidateFundAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[15]
+	mi := &file_fund_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -957,7 +1405,7 @@ func (x *ValidateFundAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateFundAccountRequest.ProtoReflect.Descriptor instead.
 func (*ValidateFundAccountRequest) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{15}
+	return file_fund_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ValidateFundAccountRequest) GetFundId() int64 {
@@ -992,7 +1440,7 @@ type ValidateFundAccountResponse struct {
 
 func (x *ValidateFundAccountResponse) Reset() {
 	*x = ValidateFundAccountResponse{}
-	mi := &file_fund_proto_msgTypes[16]
+	mi := &file_fund_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1004,7 +1452,7 @@ func (x *ValidateFundAccountResponse) String() string {
 func (*ValidateFundAccountResponse) ProtoMessage() {}
 
 func (x *ValidateFundAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[16]
+	mi := &file_fund_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1017,7 +1465,7 @@ func (x *ValidateFundAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateFundAccountResponse.ProtoReflect.Descriptor instead.
 func (*ValidateFundAccountResponse) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{16}
+	return file_fund_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ValidateFundAccountResponse) GetAccountId() int64 {
@@ -1041,6 +1489,326 @@ func (x *ValidateFundAccountResponse) GetLiquidAssets() float64 {
 	return 0
 }
 
+type FundPortfolioPosition struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ListingId       int64                  `protobuf:"varint,1,opt,name=listing_id,json=listingId,proto3" json:"listing_id,omitempty"`
+	Quantity        float64                `protobuf:"fixed64,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	AverageCost     float64                `protobuf:"fixed64,3,opt,name=average_cost,json=averageCost,proto3" json:"average_cost,omitempty"`
+	AcquisitionDate string                 `protobuf:"bytes,4,opt,name=acquisition_date,json=acquisitionDate,proto3" json:"acquisition_date,omitempty"` // "YYYY-MM-DD"
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *FundPortfolioPosition) Reset() {
+	*x = FundPortfolioPosition{}
+	mi := &file_fund_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FundPortfolioPosition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FundPortfolioPosition) ProtoMessage() {}
+
+func (x *FundPortfolioPosition) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FundPortfolioPosition.ProtoReflect.Descriptor instead.
+func (*FundPortfolioPosition) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *FundPortfolioPosition) GetListingId() int64 {
+	if x != nil {
+		return x.ListingId
+	}
+	return 0
+}
+
+func (x *FundPortfolioPosition) GetQuantity() float64 {
+	if x != nil {
+		return x.Quantity
+	}
+	return 0
+}
+
+func (x *FundPortfolioPosition) GetAverageCost() float64 {
+	if x != nil {
+		return x.AverageCost
+	}
+	return 0
+}
+
+func (x *FundPortfolioPosition) GetAcquisitionDate() string {
+	if x != nil {
+		return x.AcquisitionDate
+	}
+	return ""
+}
+
+type GetFundPortfolioRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FundId        int64                  `protobuf:"varint,1,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFundPortfolioRequest) Reset() {
+	*x = GetFundPortfolioRequest{}
+	mi := &file_fund_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFundPortfolioRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFundPortfolioRequest) ProtoMessage() {}
+
+func (x *GetFundPortfolioRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFundPortfolioRequest.ProtoReflect.Descriptor instead.
+func (*GetFundPortfolioRequest) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetFundPortfolioRequest) GetFundId() int64 {
+	if x != nil {
+		return x.FundId
+	}
+	return 0
+}
+
+type GetFundPortfolioResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Positions     []*FundPortfolioPosition `protobuf:"bytes,1,rep,name=positions,proto3" json:"positions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFundPortfolioResponse) Reset() {
+	*x = GetFundPortfolioResponse{}
+	mi := &file_fund_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFundPortfolioResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFundPortfolioResponse) ProtoMessage() {}
+
+func (x *GetFundPortfolioResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFundPortfolioResponse.ProtoReflect.Descriptor instead.
+func (*GetFundPortfolioResponse) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetFundPortfolioResponse) GetPositions() []*FundPortfolioPosition {
+	if x != nil {
+		return x.Positions
+	}
+	return nil
+}
+
+type PerformanceRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Date          string                 `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"`
+	FundValue     float64                `protobuf:"fixed64,2,opt,name=fund_value,json=fundValue,proto3" json:"fund_value,omitempty"`
+	Profit        float64                `protobuf:"fixed64,3,opt,name=profit,proto3" json:"profit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PerformanceRecord) Reset() {
+	*x = PerformanceRecord{}
+	mi := &file_fund_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PerformanceRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PerformanceRecord) ProtoMessage() {}
+
+func (x *PerformanceRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PerformanceRecord.ProtoReflect.Descriptor instead.
+func (*PerformanceRecord) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *PerformanceRecord) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
+func (x *PerformanceRecord) GetFundValue() float64 {
+	if x != nil {
+		return x.FundValue
+	}
+	return 0
+}
+
+func (x *PerformanceRecord) GetProfit() float64 {
+	if x != nil {
+		return x.Profit
+	}
+	return 0
+}
+
+type GetFundPerformanceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FundId        int64                  `protobuf:"varint,1,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
+	From          string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"` // "YYYY-MM-DD"
+	To            string                 `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFundPerformanceRequest) Reset() {
+	*x = GetFundPerformanceRequest{}
+	mi := &file_fund_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFundPerformanceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFundPerformanceRequest) ProtoMessage() {}
+
+func (x *GetFundPerformanceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFundPerformanceRequest.ProtoReflect.Descriptor instead.
+func (*GetFundPerformanceRequest) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *GetFundPerformanceRequest) GetFundId() int64 {
+	if x != nil {
+		return x.FundId
+	}
+	return 0
+}
+
+func (x *GetFundPerformanceRequest) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *GetFundPerformanceRequest) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+type GetFundPerformanceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Records       []*PerformanceRecord   `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFundPerformanceResponse) Reset() {
+	*x = GetFundPerformanceResponse{}
+	mi := &file_fund_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFundPerformanceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFundPerformanceResponse) ProtoMessage() {}
+
+func (x *GetFundPerformanceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_fund_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFundPerformanceResponse.ProtoReflect.Descriptor instead.
+func (*GetFundPerformanceResponse) Descriptor() ([]byte, []int) {
+	return file_fund_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GetFundPerformanceResponse) GetRecords() []*PerformanceRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
 type UpdateFundHoldingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FundId        int64                  `protobuf:"varint,1,opt,name=fund_id,json=fundId,proto3" json:"fund_id,omitempty"`
@@ -1054,7 +1822,7 @@ type UpdateFundHoldingRequest struct {
 
 func (x *UpdateFundHoldingRequest) Reset() {
 	*x = UpdateFundHoldingRequest{}
-	mi := &file_fund_proto_msgTypes[17]
+	mi := &file_fund_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1066,7 +1834,7 @@ func (x *UpdateFundHoldingRequest) String() string {
 func (*UpdateFundHoldingRequest) ProtoMessage() {}
 
 func (x *UpdateFundHoldingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[17]
+	mi := &file_fund_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1079,7 +1847,7 @@ func (x *UpdateFundHoldingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateFundHoldingRequest.ProtoReflect.Descriptor instead.
 func (*UpdateFundHoldingRequest) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{17}
+	return file_fund_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UpdateFundHoldingRequest) GetFundId() int64 {
@@ -1125,7 +1893,7 @@ type UpdateFundHoldingResponse struct {
 
 func (x *UpdateFundHoldingResponse) Reset() {
 	*x = UpdateFundHoldingResponse{}
-	mi := &file_fund_proto_msgTypes[18]
+	mi := &file_fund_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1137,7 +1905,7 @@ func (x *UpdateFundHoldingResponse) String() string {
 func (*UpdateFundHoldingResponse) ProtoMessage() {}
 
 func (x *UpdateFundHoldingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fund_proto_msgTypes[18]
+	mi := &file_fund_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1150,7 +1918,7 @@ func (x *UpdateFundHoldingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateFundHoldingResponse.ProtoReflect.Descriptor instead.
 func (*UpdateFundHoldingResponse) Descriptor() ([]byte, []int) {
-	return file_fund_proto_rawDescGZIP(), []int{18}
+	return file_fund_proto_rawDescGZIP(), []int{32}
 }
 
 var File_fund_proto protoreflect.FileDescriptor
@@ -1217,7 +1985,15 @@ const file_fund_proto_rawDesc = "" +
 	"\vclient_type\x18\x03 \x01(\tR\n" +
 	"clientType\x124\n" +
 	"\x16destination_account_id\x18\x04 \x01(\x03R\x14destinationAccountId\x12\x16\n" +
-	"\x06amount\x18\x05 \x01(\x01R\x06amount\"\xde\x01\n" +
+	"\x06amount\x18\x05 \x01(\x01R\x06amount\"r\n" +
+	"\x14WithdrawFundResponse\x12\x18\n" +
+	"\apending\x18\x01 \x01(\bR\apending\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
+	"\x04fund\x18\x03 \x01(\v2\x12.fund.FundResponseR\x04fund\"9\n" +
+	"\x1eCheckPendingWithdrawalsRequest\x12\x17\n" +
+	"\afund_id\x18\x01 \x01(\x03R\x06fundId\"?\n" +
+	"\x1fCheckPendingWithdrawalsResponse\x12\x1c\n" +
+	"\tcompleted\x18\x01 \x01(\x03R\tcompleted\"\xde\x01\n" +
 	"\x10BankFundPosition\x12\x17\n" +
 	"\afund_id\x18\x01 \x01(\x03R\x06fundId\x12\x1b\n" +
 	"\tfund_name\x18\x02 \x01(\tR\bfundName\x12!\n" +
@@ -1228,7 +2004,29 @@ const file_fund_proto_rawDesc = "" +
 	"profit_rsd\x18\x06 \x01(\x01R\tprofitRsd\"\x19\n" +
 	"\x17GetBankPositionsRequest\"P\n" +
 	"\x18GetBankPositionsResponse\x124\n" +
-	"\tpositions\x18\x01 \x03(\v2\x16.fund.BankFundPositionR\tpositions\"}\n" +
+	"\tpositions\x18\x01 \x03(\v2\x16.fund.BankFundPositionR\tpositions\"\xe9\x02\n" +
+	"\x12ClientFundPosition\x12\x17\n" +
+	"\afund_id\x18\x01 \x01(\x03R\x06fundId\x12\x1b\n" +
+	"\tfund_name\x18\x02 \x01(\tR\bfundName\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1d\n" +
+	"\n" +
+	"fund_value\x18\x04 \x01(\x01R\tfundValue\x12'\n" +
+	"\x0ffund_percentage\x18\x05 \x01(\x01R\x0efundPercentage\x124\n" +
+	"\x16current_position_value\x18\x06 \x01(\x01R\x14currentPositionValue\x122\n" +
+	"\x15total_invested_amount\x18\a \x01(\x01R\x13totalInvestedAmount\x12\x16\n" +
+	"\x06profit\x18\b \x01(\x01R\x06profit\x121\n" +
+	"\x14minimum_contribution\x18\t \x01(\x01R\x13minimumContribution\"U\n" +
+	"\x15GetMyPositionsRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\x03R\bclientId\x12\x1f\n" +
+	"\vclient_type\x18\x02 \x01(\tR\n" +
+	"clientType\"P\n" +
+	"\x16GetMyPositionsResponse\x126\n" +
+	"\tpositions\x18\x01 \x03(\v2\x18.fund.ClientFundPositionR\tpositions\"k\n" +
+	"\x1dTransferFundsByManagerRequest\x12$\n" +
+	"\x0eold_manager_id\x18\x01 \x01(\x03R\foldManagerId\x12$\n" +
+	"\x0enew_manager_id\x18\x02 \x01(\x03R\fnewManagerId\"M\n" +
+	"\x1eTransferFundsByManagerResponse\x12+\n" +
+	"\x11funds_transferred\x18\x01 \x01(\x03R\x10fundsTransferred\"}\n" +
 	"\x1aValidateFundAccountRequest\x12\x17\n" +
 	"\afund_id\x18\x01 \x01(\x03R\x06fundId\x12\x1d\n" +
 	"\n" +
@@ -1238,7 +2036,28 @@ const file_fund_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03R\taccountId\x12\x1b\n" +
 	"\tis_liquid\x18\x02 \x01(\bR\bisLiquid\x12#\n" +
-	"\rliquid_assets\x18\x03 \x01(\x01R\fliquidAssets\"\xa2\x01\n" +
+	"\rliquid_assets\x18\x03 \x01(\x01R\fliquidAssets\"\xa0\x01\n" +
+	"\x15FundPortfolioPosition\x12\x1d\n" +
+	"\n" +
+	"listing_id\x18\x01 \x01(\x03R\tlistingId\x12\x1a\n" +
+	"\bquantity\x18\x02 \x01(\x01R\bquantity\x12!\n" +
+	"\faverage_cost\x18\x03 \x01(\x01R\vaverageCost\x12)\n" +
+	"\x10acquisition_date\x18\x04 \x01(\tR\x0facquisitionDate\"2\n" +
+	"\x17GetFundPortfolioRequest\x12\x17\n" +
+	"\afund_id\x18\x01 \x01(\x03R\x06fundId\"U\n" +
+	"\x18GetFundPortfolioResponse\x129\n" +
+	"\tpositions\x18\x01 \x03(\v2\x1b.fund.FundPortfolioPositionR\tpositions\"^\n" +
+	"\x11PerformanceRecord\x12\x12\n" +
+	"\x04date\x18\x01 \x01(\tR\x04date\x12\x1d\n" +
+	"\n" +
+	"fund_value\x18\x02 \x01(\x01R\tfundValue\x12\x16\n" +
+	"\x06profit\x18\x03 \x01(\x01R\x06profit\"X\n" +
+	"\x19GetFundPerformanceRequest\x12\x17\n" +
+	"\afund_id\x18\x01 \x01(\x03R\x06fundId\x12\x12\n" +
+	"\x04from\x18\x02 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x03 \x01(\tR\x02to\"O\n" +
+	"\x1aGetFundPerformanceResponse\x121\n" +
+	"\arecords\x18\x01 \x03(\v2\x17.fund.PerformanceRecordR\arecords\"\xa2\x01\n" +
 	"\x18UpdateFundHoldingRequest\x12\x17\n" +
 	"\afund_id\x18\x01 \x01(\x03R\x06fundId\x12\x1d\n" +
 	"\n" +
@@ -1246,7 +2065,7 @@ const file_fund_proto_rawDesc = "" +
 	"\bquantity\x18\x03 \x01(\x03R\bquantity\x12\x14\n" +
 	"\x05price\x18\x04 \x01(\x01R\x05price\x12\x1c\n" +
 	"\tdirection\x18\x05 \x01(\tR\tdirection\"\x1b\n" +
-	"\x19UpdateFundHoldingResponse2\xe5\x05\n" +
+	"\x19UpdateFundHoldingResponse2\xba\t\n" +
 	"\vFundService\x12-\n" +
 	"\x04Ping\x12\x11.fund.PingRequest\x1a\x12.fund.PingResponse\x129\n" +
 	"\n" +
@@ -1258,11 +2077,16 @@ const file_fund_proto_rawDesc = "" +
 	"\n" +
 	"DeleteFund\x12\x17.fund.DeleteFundRequest\x1a\x18.fund.DeleteFundResponse\x129\n" +
 	"\n" +
-	"InvestFund\x12\x17.fund.InvestFundRequest\x1a\x12.fund.FundResponse\x12=\n" +
-	"\fWithdrawFund\x12\x19.fund.WithdrawFundRequest\x1a\x12.fund.FundResponse\x12Q\n" +
-	"\x10GetBankPositions\x12\x1d.fund.GetBankPositionsRequest\x1a\x1e.fund.GetBankPositionsResponse\x12Z\n" +
+	"InvestFund\x12\x17.fund.InvestFundRequest\x1a\x12.fund.FundResponse\x12E\n" +
+	"\fWithdrawFund\x12\x19.fund.WithdrawFundRequest\x1a\x1a.fund.WithdrawFundResponse\x12f\n" +
+	"\x17CheckPendingWithdrawals\x12$.fund.CheckPendingWithdrawalsRequest\x1a%.fund.CheckPendingWithdrawalsResponse\x12Q\n" +
+	"\x10GetBankPositions\x12\x1d.fund.GetBankPositionsRequest\x1a\x1e.fund.GetBankPositionsResponse\x12K\n" +
+	"\x0eGetMyPositions\x12\x1b.fund.GetMyPositionsRequest\x1a\x1c.fund.GetMyPositionsResponse\x12c\n" +
+	"\x16TransferFundsByManager\x12#.fund.TransferFundsByManagerRequest\x1a$.fund.TransferFundsByManagerResponse\x12Z\n" +
 	"\x13ValidateFundAccount\x12 .fund.ValidateFundAccountRequest\x1a!.fund.ValidateFundAccountResponse\x12T\n" +
-	"\x11UpdateFundHolding\x12\x1e.fund.UpdateFundHoldingRequest\x1a\x1f.fund.UpdateFundHoldingResponseB9Z7github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fundb\x06proto3"
+	"\x11UpdateFundHolding\x12\x1e.fund.UpdateFundHoldingRequest\x1a\x1f.fund.UpdateFundHoldingResponse\x12Q\n" +
+	"\x10GetFundPortfolio\x12\x1d.fund.GetFundPortfolioRequest\x1a\x1e.fund.GetFundPortfolioResponse\x12^\n" +
+	"\x19GetFundPerformanceHistory\x12\x1f.fund.GetFundPerformanceRequest\x1a .fund.GetFundPerformanceResponseB9Z7github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/fundb\x06proto3"
 
 var (
 	file_fund_proto_rawDescOnce sync.Once
@@ -1276,58 +2100,86 @@ func file_fund_proto_rawDescGZIP() []byte {
 	return file_fund_proto_rawDescData
 }
 
-var file_fund_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_fund_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_fund_proto_goTypes = []any{
-	(*PingRequest)(nil),                 // 0: fund.PingRequest
-	(*PingResponse)(nil),                // 1: fund.PingResponse
-	(*CreateFundRequest)(nil),           // 2: fund.CreateFundRequest
-	(*UpdateFundRequest)(nil),           // 3: fund.UpdateFundRequest
-	(*DeleteFundRequest)(nil),           // 4: fund.DeleteFundRequest
-	(*DeleteFundResponse)(nil),          // 5: fund.DeleteFundResponse
-	(*ListFundsRequest)(nil),            // 6: fund.ListFundsRequest
-	(*GetFundRequest)(nil),              // 7: fund.GetFundRequest
-	(*FundResponse)(nil),                // 8: fund.FundResponse
-	(*ListFundsResponse)(nil),           // 9: fund.ListFundsResponse
-	(*InvestFundRequest)(nil),           // 10: fund.InvestFundRequest
-	(*WithdrawFundRequest)(nil),         // 11: fund.WithdrawFundRequest
-	(*BankFundPosition)(nil),            // 12: fund.BankFundPosition
-	(*GetBankPositionsRequest)(nil),     // 13: fund.GetBankPositionsRequest
-	(*GetBankPositionsResponse)(nil),    // 14: fund.GetBankPositionsResponse
-	(*ValidateFundAccountRequest)(nil),  // 15: fund.ValidateFundAccountRequest
-	(*ValidateFundAccountResponse)(nil), // 16: fund.ValidateFundAccountResponse
-	(*UpdateFundHoldingRequest)(nil),    // 17: fund.UpdateFundHoldingRequest
-	(*UpdateFundHoldingResponse)(nil),   // 18: fund.UpdateFundHoldingResponse
+	(*PingRequest)(nil),                     // 0: fund.PingRequest
+	(*PingResponse)(nil),                    // 1: fund.PingResponse
+	(*CreateFundRequest)(nil),               // 2: fund.CreateFundRequest
+	(*UpdateFundRequest)(nil),               // 3: fund.UpdateFundRequest
+	(*DeleteFundRequest)(nil),               // 4: fund.DeleteFundRequest
+	(*DeleteFundResponse)(nil),              // 5: fund.DeleteFundResponse
+	(*ListFundsRequest)(nil),                // 6: fund.ListFundsRequest
+	(*GetFundRequest)(nil),                  // 7: fund.GetFundRequest
+	(*FundResponse)(nil),                    // 8: fund.FundResponse
+	(*ListFundsResponse)(nil),               // 9: fund.ListFundsResponse
+	(*InvestFundRequest)(nil),               // 10: fund.InvestFundRequest
+	(*WithdrawFundRequest)(nil),             // 11: fund.WithdrawFundRequest
+	(*WithdrawFundResponse)(nil),            // 12: fund.WithdrawFundResponse
+	(*CheckPendingWithdrawalsRequest)(nil),  // 13: fund.CheckPendingWithdrawalsRequest
+	(*CheckPendingWithdrawalsResponse)(nil), // 14: fund.CheckPendingWithdrawalsResponse
+	(*BankFundPosition)(nil),                // 15: fund.BankFundPosition
+	(*GetBankPositionsRequest)(nil),         // 16: fund.GetBankPositionsRequest
+	(*GetBankPositionsResponse)(nil),        // 17: fund.GetBankPositionsResponse
+	(*ClientFundPosition)(nil),              // 18: fund.ClientFundPosition
+	(*GetMyPositionsRequest)(nil),           // 19: fund.GetMyPositionsRequest
+	(*GetMyPositionsResponse)(nil),          // 20: fund.GetMyPositionsResponse
+	(*TransferFundsByManagerRequest)(nil),   // 21: fund.TransferFundsByManagerRequest
+	(*TransferFundsByManagerResponse)(nil),  // 22: fund.TransferFundsByManagerResponse
+	(*ValidateFundAccountRequest)(nil),      // 23: fund.ValidateFundAccountRequest
+	(*ValidateFundAccountResponse)(nil),     // 24: fund.ValidateFundAccountResponse
+	(*FundPortfolioPosition)(nil),           // 25: fund.FundPortfolioPosition
+	(*GetFundPortfolioRequest)(nil),         // 26: fund.GetFundPortfolioRequest
+	(*GetFundPortfolioResponse)(nil),        // 27: fund.GetFundPortfolioResponse
+	(*PerformanceRecord)(nil),               // 28: fund.PerformanceRecord
+	(*GetFundPerformanceRequest)(nil),       // 29: fund.GetFundPerformanceRequest
+	(*GetFundPerformanceResponse)(nil),      // 30: fund.GetFundPerformanceResponse
+	(*UpdateFundHoldingRequest)(nil),        // 31: fund.UpdateFundHoldingRequest
+	(*UpdateFundHoldingResponse)(nil),       // 32: fund.UpdateFundHoldingResponse
 }
 var file_fund_proto_depIdxs = []int32{
 	8,  // 0: fund.ListFundsResponse.funds:type_name -> fund.FundResponse
-	12, // 1: fund.GetBankPositionsResponse.positions:type_name -> fund.BankFundPosition
-	0,  // 2: fund.FundService.Ping:input_type -> fund.PingRequest
-	2,  // 3: fund.FundService.CreateFund:input_type -> fund.CreateFundRequest
-	6,  // 4: fund.FundService.ListFunds:input_type -> fund.ListFundsRequest
-	7,  // 5: fund.FundService.GetFund:input_type -> fund.GetFundRequest
-	3,  // 6: fund.FundService.UpdateFund:input_type -> fund.UpdateFundRequest
-	4,  // 7: fund.FundService.DeleteFund:input_type -> fund.DeleteFundRequest
-	10, // 8: fund.FundService.InvestFund:input_type -> fund.InvestFundRequest
-	11, // 9: fund.FundService.WithdrawFund:input_type -> fund.WithdrawFundRequest
-	13, // 10: fund.FundService.GetBankPositions:input_type -> fund.GetBankPositionsRequest
-	15, // 11: fund.FundService.ValidateFundAccount:input_type -> fund.ValidateFundAccountRequest
-	17, // 12: fund.FundService.UpdateFundHolding:input_type -> fund.UpdateFundHoldingRequest
-	1,  // 13: fund.FundService.Ping:output_type -> fund.PingResponse
-	8,  // 14: fund.FundService.CreateFund:output_type -> fund.FundResponse
-	9,  // 15: fund.FundService.ListFunds:output_type -> fund.ListFundsResponse
-	8,  // 16: fund.FundService.GetFund:output_type -> fund.FundResponse
-	8,  // 17: fund.FundService.UpdateFund:output_type -> fund.FundResponse
-	5,  // 18: fund.FundService.DeleteFund:output_type -> fund.DeleteFundResponse
-	8,  // 19: fund.FundService.InvestFund:output_type -> fund.FundResponse
-	8,  // 20: fund.FundService.WithdrawFund:output_type -> fund.FundResponse
-	14, // 21: fund.FundService.GetBankPositions:output_type -> fund.GetBankPositionsResponse
-	16, // 22: fund.FundService.ValidateFundAccount:output_type -> fund.ValidateFundAccountResponse
-	18, // 23: fund.FundService.UpdateFundHolding:output_type -> fund.UpdateFundHoldingResponse
-	13, // [13:24] is the sub-list for method output_type
-	2,  // [2:13] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	8,  // 1: fund.WithdrawFundResponse.fund:type_name -> fund.FundResponse
+	15, // 2: fund.GetBankPositionsResponse.positions:type_name -> fund.BankFundPosition
+	18, // 3: fund.GetMyPositionsResponse.positions:type_name -> fund.ClientFundPosition
+	25, // 4: fund.GetFundPortfolioResponse.positions:type_name -> fund.FundPortfolioPosition
+	28, // 5: fund.GetFundPerformanceResponse.records:type_name -> fund.PerformanceRecord
+	0,  // 6: fund.FundService.Ping:input_type -> fund.PingRequest
+	2,  // 7: fund.FundService.CreateFund:input_type -> fund.CreateFundRequest
+	6,  // 8: fund.FundService.ListFunds:input_type -> fund.ListFundsRequest
+	7,  // 9: fund.FundService.GetFund:input_type -> fund.GetFundRequest
+	3,  // 10: fund.FundService.UpdateFund:input_type -> fund.UpdateFundRequest
+	4,  // 11: fund.FundService.DeleteFund:input_type -> fund.DeleteFundRequest
+	10, // 12: fund.FundService.InvestFund:input_type -> fund.InvestFundRequest
+	11, // 13: fund.FundService.WithdrawFund:input_type -> fund.WithdrawFundRequest
+	13, // 14: fund.FundService.CheckPendingWithdrawals:input_type -> fund.CheckPendingWithdrawalsRequest
+	16, // 15: fund.FundService.GetBankPositions:input_type -> fund.GetBankPositionsRequest
+	19, // 16: fund.FundService.GetMyPositions:input_type -> fund.GetMyPositionsRequest
+	21, // 17: fund.FundService.TransferFundsByManager:input_type -> fund.TransferFundsByManagerRequest
+	23, // 18: fund.FundService.ValidateFundAccount:input_type -> fund.ValidateFundAccountRequest
+	31, // 19: fund.FundService.UpdateFundHolding:input_type -> fund.UpdateFundHoldingRequest
+	26, // 20: fund.FundService.GetFundPortfolio:input_type -> fund.GetFundPortfolioRequest
+	29, // 21: fund.FundService.GetFundPerformanceHistory:input_type -> fund.GetFundPerformanceRequest
+	1,  // 22: fund.FundService.Ping:output_type -> fund.PingResponse
+	8,  // 23: fund.FundService.CreateFund:output_type -> fund.FundResponse
+	9,  // 24: fund.FundService.ListFunds:output_type -> fund.ListFundsResponse
+	8,  // 25: fund.FundService.GetFund:output_type -> fund.FundResponse
+	8,  // 26: fund.FundService.UpdateFund:output_type -> fund.FundResponse
+	5,  // 27: fund.FundService.DeleteFund:output_type -> fund.DeleteFundResponse
+	8,  // 28: fund.FundService.InvestFund:output_type -> fund.FundResponse
+	12, // 29: fund.FundService.WithdrawFund:output_type -> fund.WithdrawFundResponse
+	14, // 30: fund.FundService.CheckPendingWithdrawals:output_type -> fund.CheckPendingWithdrawalsResponse
+	17, // 31: fund.FundService.GetBankPositions:output_type -> fund.GetBankPositionsResponse
+	20, // 32: fund.FundService.GetMyPositions:output_type -> fund.GetMyPositionsResponse
+	22, // 33: fund.FundService.TransferFundsByManager:output_type -> fund.TransferFundsByManagerResponse
+	24, // 34: fund.FundService.ValidateFundAccount:output_type -> fund.ValidateFundAccountResponse
+	32, // 35: fund.FundService.UpdateFundHolding:output_type -> fund.UpdateFundHoldingResponse
+	27, // 36: fund.FundService.GetFundPortfolio:output_type -> fund.GetFundPortfolioResponse
+	30, // 37: fund.FundService.GetFundPerformanceHistory:output_type -> fund.GetFundPerformanceResponse
+	22, // [22:38] is the sub-list for method output_type
+	6,  // [6:22] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_fund_proto_init() }
@@ -1341,7 +2193,7 @@ func file_fund_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fund_proto_rawDesc), len(file_fund_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

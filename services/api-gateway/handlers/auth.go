@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/auth"
@@ -350,6 +351,23 @@ func ActivateClient(client pb.AuthServiceClient) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "account activated successfully"})
+	}
+}
+
+// Logout godoc
+// @Summary      Logout
+// @Description  Revoke the current access token (adds jti to Redis blacklist).
+// @Tags         auth
+// @Produce      json
+// @Success      200  {object}  map[string]string
+// @Router       /auth/logout [post]
+func Logout(client pb.AuthServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenStr := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+		_, _ = client.Logout(ctx, &pb.LogoutRequest{Token: tokenStr})
+		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 	}
 }
 

@@ -51,13 +51,21 @@ func main() {
 	}
 	defer func() { _ = securitiesDB.Close() }()
 
-	// Daily contract expiration
+	// Hourly contract expiration: marks ACTIVE contracts as EXPIRED once the
+	// buyer's exercise window (settlementDate + 24h) has passed.
+	// Runs immediately on startup so stale contracts are cleaned up at boot.
+	expireContracts := func() {
+		if _, err := otcDB.Exec(
+			`UPDATE otc_contracts SET status='EXPIRED'
+			 WHERE status='ACTIVE' AND settlement_date + INTERVAL '1 day' < NOW()`,
+		); err != nil {
+			log.Printf("contract expiration job error: %v", err)
+		}
+	}
 	go func() {
-		for range time.Tick(24 * time.Hour) {
-			_, expErr := otcDB.Exec(`UPDATE otc_contracts SET status='EXPIRED' WHERE status='ACTIVE' AND settlement_date < CURRENT_DATE`)
-			if expErr != nil {
-				log.Printf("contract expiration job error: %v", expErr)
-			}
+		expireContracts()
+		for range time.Tick(time.Hour) {
+			expireContracts()
 		}
 	}()
 

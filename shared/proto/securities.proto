@@ -157,6 +157,8 @@ message ListingSummary {
   double strike_price    = 15;
   string settlement_date = 16; // "YYYY-MM-DD"
   int64  open_interest   = 17;
+
+  string currency        = 18; // ISO currency code of the listing's exchange (e.g. "USD")
 }
 
 message GetListingsResponse {

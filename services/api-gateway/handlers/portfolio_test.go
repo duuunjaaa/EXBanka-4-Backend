@@ -20,6 +20,7 @@ type stubPortfolioClient struct {
 	getTaxListFn        func(context.Context, *pb.GetTaxListRequest, ...grpc.CallOption) (*pb.GetTaxListResponse, error)
 	collectTaxFn        func(context.Context, *pb.CollectTaxRequest, ...grpc.CallOption) (*pb.CollectTaxResponse, error)
 	collectTaxForUserFn func(context.Context, *pb.CollectTaxForUserRequest, ...grpc.CallOption) (*pb.CollectTaxForUserResponse, error)
+	setPublicModeFn     func(context.Context, *pb.SetPublicModeRequest, ...grpc.CallOption) (*pb.SetPublicModeResponse, error)
 }
 
 func (s *stubPortfolioClient) UpdateHolding(ctx context.Context, in *pb.UpdateHoldingRequest, opts ...grpc.CallOption) (*pb.UpdateHoldingResponse, error) {
@@ -65,6 +66,9 @@ func (s *stubPortfolioClient) CollectTaxForUser(ctx context.Context, in *pb.Coll
 	return nil, fmt.Errorf("not implemented")
 }
 func (s *stubPortfolioClient) SetPublicMode(ctx context.Context, in *pb.SetPublicModeRequest, opts ...grpc.CallOption) (*pb.SetPublicModeResponse, error) {
+	if s.setPublicModeFn != nil {
+		return s.setPublicModeFn(ctx, in, opts...)
+	}
 	return nil, fmt.Errorf("not implemented")
 }
 

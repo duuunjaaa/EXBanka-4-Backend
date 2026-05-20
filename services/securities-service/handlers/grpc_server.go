@@ -8,13 +8,56 @@ import (
 
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/securities"
 	"github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
+
+const listingCacheTTL = 15 * time.Minute
 
 type SecuritiesServer struct {
 	pb.UnimplementedSecuritiesServiceServer
-	DB *sql.DB
+	DB    *sql.DB
+	Redis *redis.Client
+}
+
+func listingCacheKey(id int64) string {
+	return fmt.Sprintf("listing:%d", id)
+}
+
+func (s *SecuritiesServer) loadCachedListing(ctx context.Context, id int64) *pb.GetListingByIdResponse {
+	if s.Redis == nil {
+		return nil
+	}
+	data, err := s.Redis.Get(ctx, listingCacheKey(id)).Bytes()
+	if err != nil {
+		return nil
+	}
+	var resp pb.GetListingByIdResponse
+	if err := protojson.Unmarshal(data, &resp); err != nil {
+		return nil
+	}
+	return &resp
+}
+
+func (s *SecuritiesServer) storeCachedListing(ctx context.Context, id int64, resp *pb.GetListingByIdResponse) {
+	if s.Redis == nil {
+		return
+	}
+	data, err := protojson.Marshal(resp)
+	if err != nil {
+		return
+	}
+	_ = s.Redis.Set(ctx, listingCacheKey(id), data, listingCacheTTL).Err()
+}
+
+// InvalidateListing deletes the cached listing from Redis. Called by the price refresh scheduler.
+func (s *SecuritiesServer) InvalidateListing(ctx context.Context, id int64) {
+	if s.Redis == nil {
+		return
+	}
+	_ = s.Redis.Del(ctx, listingCacheKey(id)).Err()
 }
 
 // ── Ping ──────────────────────────────────────────────────────────────────────
@@ -468,7 +511,7 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 	totalPages := int32((total + int64(pageSize) - 1) / int64(pageSize))
 
 	query := fmt.Sprintf(`
-		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym,
+		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym, se.currency,
 		       l.price, l.ask, l.bid, l.volume, l.change,
 		       COALESCE(ls.outstanding_shares, 0),
 		       COALESCE(lfc.contract_size, 1),
@@ -489,23 +532,23 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 	var listings []*pb.ListingSummary
 	for rows.Next() {
 		var (
-			id              int64
-			ticker, name    string
-			lType, acronym  string
-			price, ask, bid float64
-			volume          int64
-			change          float64
-			outshares       int64
-			contractSize    float64
-			stockListingID  sql.NullInt64
-			stockPrice      float64
-			optionType      sql.NullString
-			strikePrice     sql.NullFloat64
-			settlementDate  sql.NullTime
-			openInterest    sql.NullInt64
+			id                     int64
+			ticker, name           string
+			lType, acronym, curr   string
+			price, ask, bid        float64
+			volume                 int64
+			change                 float64
+			outshares              int64
+			contractSize           float64
+			stockListingID         sql.NullInt64
+			stockPrice             float64
+			optionType             sql.NullString
+			strikePrice            sql.NullFloat64
+			settlementDate         sql.NullTime
+			openInterest           sql.NullInt64
 		)
 		if err := rows.Scan(
-			&id, &ticker, &name, &lType, &acronym,
+			&id, &ticker, &name, &lType, &acronym, &curr,
 			&price, &ask, &bid, &volume, &change,
 			&outshares, &contractSize, &stockListingID, &stockPrice,
 			&optionType, &strikePrice, &settlementDate, &openInterest,
@@ -520,6 +563,7 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 			Name:              name,
 			Type:              lType,
 			ExchangeAcronym:   acronym,
+			Currency:          curr,
 			Price:             price,
 			Ask:               ask,
 			Bid:               bid,
@@ -547,9 +591,13 @@ func (s *SecuritiesServer) GetListings(ctx context.Context, req *pb.GetListingsR
 }
 
 func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListingByIdRequest) (*pb.GetListingByIdResponse, error) {
+	if cached := s.loadCachedListing(ctx, req.Id); cached != nil {
+		return cached, nil
+	}
+
 	var (
-		id                           int64
-		ticker, name, lType, acronym string
+		id                                int64
+		ticker, name, lType, acronym, curr string
 		price, ask, bid              float64
 		volume                       int64
 		change                       float64
@@ -571,7 +619,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		optionSettlement sql.NullTime
 	)
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym,
+		SELECT l.id, l.ticker, l.name, l.type::text, se.acronym, se.currency,
 		       l.price, l.ask, l.bid, l.volume, l.change,
 		       ls.outstanding_shares, ls.dividend_yield,
 		       lfp.base_currency, lfp.quote_currency, lfp.liquidity::text,
@@ -585,7 +633,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		LEFT JOIN listing_futures_contract lfc ON l.id = lfc.listing_id
 		LEFT JOIN listing_option lo ON l.id = lo.listing_id
 		WHERE l.id = $1`, req.Id).Scan(
-		&id, &ticker, &name, &lType, &acronym,
+		&id, &ticker, &name, &lType, &acronym, &curr,
 		&price, &ask, &bid, &volume, &change,
 		&outshares, &dividendYield,
 		&baseCurrency, &quoteCurrency, &liquidity,
@@ -619,6 +667,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		Name:              name,
 		Type:              lType,
 		ExchangeAcronym:   acronym,
+		Currency:          curr,
 		Price:             price,
 		Ask:               ask,
 		Bid:               bid,
@@ -701,6 +750,7 @@ func (s *SecuritiesServer) GetListingById(ctx context.Context, req *pb.GetListin
 		}
 	}
 
+	s.storeCachedListing(ctx, req.Id, resp)
 	return resp, nil
 }
 

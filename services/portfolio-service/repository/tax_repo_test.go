@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 func TestInsertTaxRecord(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectExec(`INSERT INTO tax_record`).
 		WithArgs(int64(1), "CLIENT", 22.5, 4, 2026).
@@ -27,7 +28,7 @@ func TestInsertTaxRecord(t *testing.T) {
 func TestGetUnpaidRecords(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	now := time.Now()
 	mock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
@@ -46,7 +47,7 @@ func TestGetUnpaidRecords(t *testing.T) {
 func TestGetUnpaidRecordsForUser(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT id, user_id, user_type, amount_rsd, month, year, is_paid, paid_at`).
 		WithArgs(int64(5), "CLIENT").
@@ -63,7 +64,7 @@ func TestGetUnpaidRecordsForUser(t *testing.T) {
 func TestMarkTaxPaid(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectExec(`UPDATE tax_record SET is_paid`).
 		WithArgs(int64(7)).
@@ -77,7 +78,7 @@ func TestMarkTaxPaid(t *testing.T) {
 func TestGetMyTax(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(int64(1), "CLIENT", 2026, 4).
@@ -93,7 +94,7 @@ func TestGetMyTax(t *testing.T) {
 func TestGetTaxDebtList_NoFilter(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT user_id, user_type`).
 		WithArgs("").
@@ -113,7 +114,7 @@ func TestGetTaxDebtList_NoFilter(t *testing.T) {
 func TestGetTaxDebtList_UserTypeFilter(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT user_id, user_type`).
 		WithArgs("CLIENT").
@@ -131,7 +132,7 @@ func TestGetTaxDebtList_IncludesPaidUsers(t *testing.T) {
 	// A user with all taxes paid should still appear with debt_rsd = 0
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(`SELECT user_id, user_type`).
 		WithArgs("").
@@ -143,4 +144,56 @@ func TestGetTaxDebtList_IncludesPaidUsers(t *testing.T) {
 	require.Len(t, debts, 1)
 	assert.InDelta(t, 0.0, debts[0].DebtRSD, 0.001)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestGetTaxDebtList_QueryError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(`SELECT user_id, user_type`).
+		WillReturnError(sql.ErrConnDone)
+
+	_, err = GetTaxDebtList(context.Background(), db, "")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+}
+
+func TestGetTaxDebtList_ScanError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(`SELECT user_id, user_type`).
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "user_type", "debt_rsd"}).
+			AddRow("bad", "CLIENT", 100.0))
+
+	_, err = GetTaxDebtList(context.Background(), db, "")
+	assert.Error(t, err)
+}
+
+// queryTaxRecords is covered via GetUnpaidRecords and GetUnpaidRecordsForUser.
+
+func TestGetUnpaidRecords_QueryError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(`SELECT id, user_id`).
+		WillReturnError(sql.ErrConnDone)
+
+	_, err = GetUnpaidRecords(context.Background(), db)
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+}
+
+func TestGetUnpaidRecords_ScanError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(`SELECT id, user_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "user_type", "amount_rsd", "month", "year", "is_paid", "paid_at"}).
+			AddRow("bad", int64(1), "CLIENT", 10.0, 1, 2026, false, (*time.Time)(nil)))
+
+	_, err = GetUnpaidRecords(context.Background(), db)
+	assert.Error(t, err)
 }

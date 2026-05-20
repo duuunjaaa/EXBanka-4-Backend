@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"unicode"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,6 +35,7 @@ type AuthServer struct {
 	EmployeeClient pb_emp.EmployeeServiceClient
 	EmailClient    pb_email.EmailServiceClient
 	ClientClient   pb_client.ClientServiceClient
+	Redis          *redis.Client
 }
 
 func (s *AuthServer) Login(ctx context.Context, req *pb_auth.LoginRequest) (*pb_auth.LoginResponse, error) {
@@ -132,6 +136,7 @@ func (s *AuthServer) Refresh(_ context.Context, req *pb_auth.RefreshRequest) (*p
 
 func generateToken(userID int64, username, tokenType string, dozvole []string, firstName, lastName, email string, d time.Duration) (string, error) {
 	claims := jwt.MapClaims{
+		"jti":        uuid.New().String(),
 		"user_id":    userID,
 		"username":   username,
 		"first_name": firstName,
@@ -331,6 +336,7 @@ func validatePassword(p string) error {
 
 func generateClientToken(userID int64, email, tokenType, firstName, lastName string, d time.Duration) (string, error) {
 	claims := jwt.MapClaims{
+		"jti":        uuid.New().String(),
 		"user_id":    userID,
 		"email":      email,
 		"first_name": firstName,
@@ -340,6 +346,51 @@ func generateClientToken(userID int64, email, tokenType, firstName, lastName str
 		"exp":        time.Now().Add(d).Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(jwtSecret))
+}
+
+type approvalCache struct {
+	ActionType string `json:"action_type"`
+	Payload    string `json:"payload"`
+	Status     string `json:"status"`
+	ExpiresAt  string `json:"expires_at"`
+}
+
+func approvalCacheKey(id int64) string {
+	return fmt.Sprintf("approval:%d", id)
+}
+
+func (s *AuthServer) storeApprovalCache(ctx context.Context, id int64, a *approvalCache) {
+	if s.Redis == nil {
+		return
+	}
+	data, err := json.Marshal(a)
+	if err != nil {
+		return
+	}
+	exp, err := time.Parse(time.RFC3339, a.ExpiresAt)
+	if err != nil {
+		return
+	}
+	ttl := time.Until(exp)
+	if ttl <= 0 {
+		return
+	}
+	_ = s.Redis.Set(ctx, approvalCacheKey(id), data, ttl).Err()
+}
+
+func (s *AuthServer) loadApprovalCache(ctx context.Context, id int64) *approvalCache {
+	if s.Redis == nil {
+		return nil
+	}
+	data, err := s.Redis.Get(ctx, approvalCacheKey(id)).Bytes()
+	if err != nil {
+		return nil
+	}
+	var a approvalCache
+	if err := json.Unmarshal(data, &a); err != nil {
+		return nil
+	}
+	return &a
 }
 
 func (s *AuthServer) ClientLogin(ctx context.Context, req *pb_auth.ClientLoginRequest) (*pb_auth.ClientLoginResponse, error) {
@@ -400,7 +451,7 @@ func (s *AuthServer) ClientLogin(ctx context.Context, req *pb_auth.ClientLoginRe
 		return nil, status.Errorf(codes.Internal, "failed to create login approval: %v", err)
 	}
 
-	go s.sendApprovalPush(creds.Id, &pb_auth.Approval{
+	approval := &pb_auth.Approval{
 		Id:         approvalID,
 		ClientId:   creds.Id,
 		ActionType: "LOGIN",
@@ -408,12 +459,39 @@ func (s *AuthServer) ClientLogin(ctx context.Context, req *pb_auth.ClientLoginRe
 		Status:     "PENDING",
 		CreatedAt:  createdAt.Format(time.RFC3339),
 		ExpiresAt:  expiresAt.Format(time.RFC3339),
+	}
+	s.storeApprovalCache(ctx, approvalID, &approvalCache{
+		ActionType: approval.ActionType,
+		Payload:    approval.Payload,
+		Status:     approval.Status,
+		ExpiresAt:  approval.ExpiresAt,
 	})
+	go s.sendApprovalPush(creds.Id, approval)
 
 	return &pb_auth.ClientLoginResponse{ApprovalRequestId: approvalID}, nil
 }
 
 func (s *AuthServer) PollApproval(ctx context.Context, req *pb_auth.PollApprovalRequest) (*pb_auth.PollApprovalResponse, error) {
+	// Try Redis cache first
+	if cached := s.loadApprovalCache(ctx, req.Id); cached != nil {
+		exp, _ := time.Parse(time.RFC3339, cached.ExpiresAt)
+		approvalStatus := cached.Status
+		if approvalStatus == "PENDING" && time.Now().After(exp) {
+			_, _ = s.DB.ExecContext(ctx, `UPDATE two_factor_approvals SET status = 'EXPIRED' WHERE id = $1`, req.Id)
+			approvalStatus = "EXPIRED"
+		}
+		resp := &pb_auth.PollApprovalResponse{Status: approvalStatus}
+		if approvalStatus == "APPROVED" && cached.ActionType == "LOGIN" {
+			var tokens map[string]string
+			if err := json.Unmarshal([]byte(cached.Payload), &tokens); err == nil {
+				resp.AccessToken = tokens["access_token"]
+				resp.RefreshToken = tokens["refresh_token"]
+			}
+		}
+		return resp, nil
+	}
+
+	// Cache miss: fall back to DB
 	var actionType, approvalStatus, payload string
 	var expiresAt time.Time
 	err := s.DB.QueryRowContext(ctx,
@@ -662,6 +740,12 @@ func (s *AuthServer) UpdateApprovalStatus(ctx context.Context, req *pb_auth.Upda
 	}
 	a.CreatedAt = createdAt.Format(time.RFC3339)
 	a.ExpiresAt = expiresAt.Format(time.RFC3339)
+	s.storeApprovalCache(ctx, req.Id, &approvalCache{
+		ActionType: a.ActionType,
+		Payload:    a.Payload,
+		Status:     a.Status,
+		ExpiresAt:  a.ExpiresAt,
+	})
 	return &pb_auth.UpdateApprovalStatusResponse{Approval: &a}, nil
 }
 
@@ -732,6 +816,39 @@ func (s *AuthServer) sendApprovalPush(clientID int64, approval *pb_auth.Approval
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
+}
+
+func (s *AuthServer) Logout(ctx context.Context, req *pb_auth.LogoutRequest) (*pb_auth.LogoutResponse, error) {
+	if s.Redis == nil || req.Token == "" {
+		return &pb_auth.LogoutResponse{}, nil
+	}
+	token, err := jwt.Parse(req.Token, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return &pb_auth.LogoutResponse{}, nil
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return &pb_auth.LogoutResponse{}, nil
+	}
+	jti, _ := claims["jti"].(string)
+	if jti == "" {
+		return &pb_auth.LogoutResponse{}, nil
+	}
+	var ttl time.Duration
+	if exp, ok := claims["exp"].(float64); ok {
+		if remaining := time.Until(time.Unix(int64(exp), 0)); remaining > 0 {
+			ttl = remaining
+		}
+	}
+	if ttl > 0 {
+		_ = s.Redis.Set(ctx, "blacklist:"+jti, "1", ttl).Err()
+	}
+	return &pb_auth.LogoutResponse{}, nil
 }
 
 func approvalPushMessage(actionType string) (title, body string) {

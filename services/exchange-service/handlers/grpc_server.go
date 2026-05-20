@@ -9,9 +9,11 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/exchange"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -38,6 +40,56 @@ type ExchangeServer struct {
 	pb.UnimplementedExchangeServiceServer
 	DB        *sql.DB // exchange_db
 	AccountDB *sql.DB // account_db
+	Redis     *redis.Client
+}
+
+// cachedRate holds the three rate values for one currency stored in Redis.
+type cachedRate struct {
+	BuyingRate  float64 `json:"buying_rate"`
+	SellingRate float64 `json:"selling_rate"`
+	MiddleRate  float64 `json:"middle_rate"`
+}
+
+func ratesCacheKey() string {
+	return "exchange:rates:" + time.Now().Format("2006-01-02")
+}
+
+// loadCachedRates returns today's rates from Redis, or nil on miss/error.
+func (s *ExchangeServer) loadCachedRates(ctx context.Context) map[string]cachedRate {
+	if s.Redis == nil {
+		return nil
+	}
+	data, err := s.Redis.Get(ctx, ratesCacheKey()).Bytes()
+	if err != nil {
+		return nil
+	}
+	var rates map[string]cachedRate
+	if err := json.Unmarshal(data, &rates); err != nil {
+		return nil
+	}
+	return rates
+}
+
+// storeCachedRates writes today's rates to Redis with TTL until midnight.
+func (s *ExchangeServer) storeCachedRates(ctx context.Context, rates []*pb.ExchangeRate) {
+	if s.Redis == nil {
+		return
+	}
+	m := make(map[string]cachedRate, len(rates))
+	for _, r := range rates {
+		m[r.CurrencyCode] = cachedRate{
+			BuyingRate:  r.BuyingRate,
+			SellingRate: r.SellingRate,
+			MiddleRate:  r.MiddleRate,
+		}
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	_ = s.Redis.Set(ctx, ratesCacheKey(), data, time.Until(midnight)).Err()
 }
 
 // ensureTodayRates fetches rates from external API if today's rates are not yet in DB.
@@ -121,6 +173,23 @@ func (s *ExchangeServer) fetchAndStoreRates(ctx context.Context, today string) e
 
 // GetExchangeRates returns today's buy/sell/middle rates for all currencies.
 func (s *ExchangeServer) GetExchangeRates(ctx context.Context, _ *pb.GetExchangeRatesRequest) (*pb.GetExchangeRatesResponse, error) {
+	// Try Redis cache first
+	if cached := s.loadCachedRates(ctx); cached != nil {
+		today := time.Now().Format("2006-01-02")
+		rates := make([]*pb.ExchangeRate, 0, len(cached))
+		for code, r := range cached {
+			rates = append(rates, &pb.ExchangeRate{
+				CurrencyCode: code,
+				BuyingRate:   r.BuyingRate,
+				SellingRate:  r.SellingRate,
+				MiddleRate:   r.MiddleRate,
+				Date:         today,
+			})
+		}
+		sort.Slice(rates, func(i, j int) bool { return rates[i].CurrencyCode < rates[j].CurrencyCode })
+		return &pb.GetExchangeRatesResponse{Rates: rates}, nil
+	}
+
 	if err := s.ensureTodayRates(ctx); err != nil {
 		log.Printf("exchange-service: ensureTodayRates: %v", err)
 	}
@@ -149,6 +218,7 @@ func (s *ExchangeServer) GetExchangeRates(ctx context.Context, _ *pb.GetExchange
 		r.Date = d.Format("2006-01-02")
 		rates = append(rates, &r)
 	}
+	s.storeCachedRates(ctx, rates)
 	return &pb.GetExchangeRatesResponse{Rates: rates}, nil
 }
 
@@ -215,9 +285,22 @@ func (s *ExchangeServer) ConvertAmount(ctx context.Context, req *pb.ConvertAmoun
 	// 4. Get rates for involved currencies:
 	//    bank buys foreign at buying_rate (foreign → RSD),
 	//    bank sells foreign at selling_rate (RSD → foreign).
+	ratesCache := s.loadCachedRates(ctx)
 	getRate := func(code, rateType string) (float64, error) {
 		if code == "RSD" {
 			return 1.0, nil
+		}
+		if ratesCache != nil {
+			if r, ok := ratesCache[code]; ok {
+				switch rateType {
+				case "buying_rate":
+					return r.BuyingRate, nil
+				case "selling_rate":
+					return r.SellingRate, nil
+				case "middle_rate":
+					return r.MiddleRate, nil
+				}
+			}
 		}
 		var r float64
 		err := s.DB.QueryRowContext(ctx,
@@ -362,9 +445,22 @@ func (s *ExchangeServer) PreviewConversion(ctx context.Context, req *pb.PreviewC
 		log.Printf("exchange-service: ensureTodayRates: %v", err)
 	}
 
+	previewCache := s.loadCachedRates(ctx)
 	getRate := func(code, rateType string) (float64, error) {
 		if code == "RSD" {
 			return 1.0, nil
+		}
+		if previewCache != nil {
+			if r, ok := previewCache[code]; ok {
+				switch rateType {
+				case "buying_rate":
+					return r.BuyingRate, nil
+				case "selling_rate":
+					return r.SellingRate, nil
+				case "middle_rate":
+					return r.MiddleRate, nil
+				}
+			}
 		}
 		var r float64
 		err := s.DB.QueryRowContext(ctx,

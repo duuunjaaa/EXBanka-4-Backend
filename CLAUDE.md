@@ -3,6 +3,16 @@
 ## Project overview
 Go-based microservices backend for EXBanka. Services communicate via gRPC. The API Gateway is the only HTTP-facing service.
 
+## How to run the full stack
+The full stack (all services + frontend + databases) is started via the **EXBanka-4-Infrastructure** repo:
+```bash
+# from EXBanka-4-Infrastructure/
+docker compose up        # start everything
+docker compose up -d     # start in background
+docker compose up --build <service-name>  # rebuild one service after code changes
+```
+The app is accessed at **http://localhost:3000**. The API gateway is at **http://localhost:8083**.
+
 ## Go modules
 - Multi-module workspace (`go.work` at repo root)
 - One `go.mod` per service: `services/<name>/go.mod`
