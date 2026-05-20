@@ -200,11 +200,11 @@ func TestIsExchangeOpen_InPreMarket(t *testing.T) {
 func TestPrePostMarketSegment(t *testing.T) {
 	window := 4 * time.Hour
 	tests := []struct {
-		name         string
-		t            string
-		open         string
-		close        string
-		want         string
+		name  string
+		t     string
+		open  string
+		close string
+		want  string
 	}{
 		{"pre_market 1h before open", "08:30", "09:30", "16:00", "pre_market"},
 		{"pre_market at boundary", "05:30", "09:30", "16:00", "pre_market"},

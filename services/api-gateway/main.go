@@ -121,6 +121,9 @@ func main() {
 
 	r := gin.Default()
 
+	// Inter-bank 2PC endpoint — authenticated by X-Api-Key, no JWT
+	r.POST("/interbank", handlers.InterbankHandler(paymentClient))
+
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
