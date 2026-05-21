@@ -126,6 +126,13 @@ func main() {
 	// Public stock listing for partner banks — authenticated by X-Api-Key, no JWT
 	r.GET("/public-stock", handlers.GetPublicStock(otcClient))
 
+	// OTC interbank endpoints (partner bank calls, no JWT)
+	r.POST("/otc/interbank/negotiations", handlers.IncomingCreateNegotiation(otcClient))
+	r.PUT("/otc/interbank/negotiations/:routingNumber/:id", handlers.IncomingCounterOffer(otcClient))
+	r.GET("/otc/interbank/negotiations/:routingNumber/:id", handlers.IncomingGetNegotiation(otcClient))
+	r.DELETE("/otc/interbank/negotiations/:routingNumber/:id", handlers.IncomingDeleteNegotiation(otcClient))
+	r.GET("/otc/interbank/negotiations/:routingNumber/:id/accept", handlers.IncomingAcceptNegotiation(otcClient))
+
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

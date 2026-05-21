@@ -19,16 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OtcService_Ping_FullMethodName              = "/otc.OtcService/Ping"
-	OtcService_CreateNegotiation_FullMethodName = "/otc.OtcService/CreateNegotiation"
-	OtcService_ListNegotiations_FullMethodName  = "/otc.OtcService/ListNegotiations"
-	OtcService_GetNegotiation_FullMethodName    = "/otc.OtcService/GetNegotiation"
-	OtcService_CounterOffer_FullMethodName      = "/otc.OtcService/CounterOffer"
-	OtcService_AcceptNegotiation_FullMethodName = "/otc.OtcService/AcceptNegotiation"
-	OtcService_RejectNegotiation_FullMethodName = "/otc.OtcService/RejectNegotiation"
-	OtcService_ListContracts_FullMethodName     = "/otc.OtcService/ListContracts"
-	OtcService_ExerciseContract_FullMethodName  = "/otc.OtcService/ExerciseContract"
-	OtcService_GetMarket_FullMethodName         = "/otc.OtcService/GetMarket"
+	OtcService_Ping_FullMethodName                       = "/otc.OtcService/Ping"
+	OtcService_CreateNegotiation_FullMethodName          = "/otc.OtcService/CreateNegotiation"
+	OtcService_ListNegotiations_FullMethodName           = "/otc.OtcService/ListNegotiations"
+	OtcService_GetNegotiation_FullMethodName             = "/otc.OtcService/GetNegotiation"
+	OtcService_CounterOffer_FullMethodName               = "/otc.OtcService/CounterOffer"
+	OtcService_AcceptNegotiation_FullMethodName          = "/otc.OtcService/AcceptNegotiation"
+	OtcService_RejectNegotiation_FullMethodName          = "/otc.OtcService/RejectNegotiation"
+	OtcService_ListContracts_FullMethodName              = "/otc.OtcService/ListContracts"
+	OtcService_ExerciseContract_FullMethodName           = "/otc.OtcService/ExerciseContract"
+	OtcService_GetMarket_FullMethodName                  = "/otc.OtcService/GetMarket"
+	OtcService_CreateInterbankNegotiation_FullMethodName = "/otc.OtcService/CreateInterbankNegotiation"
+	OtcService_InterbankCounterOffer_FullMethodName      = "/otc.OtcService/InterbankCounterOffer"
+	OtcService_InterbankGetNegotiation_FullMethodName    = "/otc.OtcService/InterbankGetNegotiation"
+	OtcService_InterbankDeleteNegotiation_FullMethodName = "/otc.OtcService/InterbankDeleteNegotiation"
+	OtcService_InterbankAcceptNegotiation_FullMethodName = "/otc.OtcService/InterbankAcceptNegotiation"
 )
 
 // OtcServiceClient is the client API for OtcService service.
@@ -45,6 +50,12 @@ type OtcServiceClient interface {
 	ListContracts(ctx context.Context, in *ListContractsRequest, opts ...grpc.CallOption) (*ListContractsResponse, error)
 	ExerciseContract(ctx context.Context, in *ExerciseContractRequest, opts ...grpc.CallOption) (*ExerciseContractResponse, error)
 	GetMarket(ctx context.Context, in *GetMarketRequest, opts ...grpc.CallOption) (*GetMarketResponse, error)
+	// Cross-bank (interbank) negotiation RPCs
+	CreateInterbankNegotiation(ctx context.Context, in *CreateInterbankNegotiationRequest, opts ...grpc.CallOption) (*InterbankNegotiationResponse, error)
+	InterbankCounterOffer(ctx context.Context, in *InterbankCounterOfferRequest, opts ...grpc.CallOption) (*InterbankNegotiationResponse, error)
+	InterbankGetNegotiation(ctx context.Context, in *InterbankNegotiationIdRequest, opts ...grpc.CallOption) (*InterbankNegotiationResponse, error)
+	InterbankDeleteNegotiation(ctx context.Context, in *InterbankNegotiationIdRequest, opts ...grpc.CallOption) (*OtcEmptyResponse, error)
+	InterbankAcceptNegotiation(ctx context.Context, in *InterbankNegotiationIdRequest, opts ...grpc.CallOption) (*OtcEmptyResponse, error)
 }
 
 type otcServiceClient struct {
@@ -155,6 +166,56 @@ func (c *otcServiceClient) GetMarket(ctx context.Context, in *GetMarketRequest, 
 	return out, nil
 }
 
+func (c *otcServiceClient) CreateInterbankNegotiation(ctx context.Context, in *CreateInterbankNegotiationRequest, opts ...grpc.CallOption) (*InterbankNegotiationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InterbankNegotiationResponse)
+	err := c.cc.Invoke(ctx, OtcService_CreateInterbankNegotiation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *otcServiceClient) InterbankCounterOffer(ctx context.Context, in *InterbankCounterOfferRequest, opts ...grpc.CallOption) (*InterbankNegotiationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InterbankNegotiationResponse)
+	err := c.cc.Invoke(ctx, OtcService_InterbankCounterOffer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *otcServiceClient) InterbankGetNegotiation(ctx context.Context, in *InterbankNegotiationIdRequest, opts ...grpc.CallOption) (*InterbankNegotiationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InterbankNegotiationResponse)
+	err := c.cc.Invoke(ctx, OtcService_InterbankGetNegotiation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *otcServiceClient) InterbankDeleteNegotiation(ctx context.Context, in *InterbankNegotiationIdRequest, opts ...grpc.CallOption) (*OtcEmptyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OtcEmptyResponse)
+	err := c.cc.Invoke(ctx, OtcService_InterbankDeleteNegotiation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *otcServiceClient) InterbankAcceptNegotiation(ctx context.Context, in *InterbankNegotiationIdRequest, opts ...grpc.CallOption) (*OtcEmptyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OtcEmptyResponse)
+	err := c.cc.Invoke(ctx, OtcService_InterbankAcceptNegotiation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OtcServiceServer is the server API for OtcService service.
 // All implementations must embed UnimplementedOtcServiceServer
 // for forward compatibility.
@@ -169,6 +230,12 @@ type OtcServiceServer interface {
 	ListContracts(context.Context, *ListContractsRequest) (*ListContractsResponse, error)
 	ExerciseContract(context.Context, *ExerciseContractRequest) (*ExerciseContractResponse, error)
 	GetMarket(context.Context, *GetMarketRequest) (*GetMarketResponse, error)
+	// Cross-bank (interbank) negotiation RPCs
+	CreateInterbankNegotiation(context.Context, *CreateInterbankNegotiationRequest) (*InterbankNegotiationResponse, error)
+	InterbankCounterOffer(context.Context, *InterbankCounterOfferRequest) (*InterbankNegotiationResponse, error)
+	InterbankGetNegotiation(context.Context, *InterbankNegotiationIdRequest) (*InterbankNegotiationResponse, error)
+	InterbankDeleteNegotiation(context.Context, *InterbankNegotiationIdRequest) (*OtcEmptyResponse, error)
+	InterbankAcceptNegotiation(context.Context, *InterbankNegotiationIdRequest) (*OtcEmptyResponse, error)
 	mustEmbedUnimplementedOtcServiceServer()
 }
 
@@ -208,6 +275,21 @@ func (UnimplementedOtcServiceServer) ExerciseContract(context.Context, *Exercise
 }
 func (UnimplementedOtcServiceServer) GetMarket(context.Context, *GetMarketRequest) (*GetMarketResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMarket not implemented")
+}
+func (UnimplementedOtcServiceServer) CreateInterbankNegotiation(context.Context, *CreateInterbankNegotiationRequest) (*InterbankNegotiationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateInterbankNegotiation not implemented")
+}
+func (UnimplementedOtcServiceServer) InterbankCounterOffer(context.Context, *InterbankCounterOfferRequest) (*InterbankNegotiationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InterbankCounterOffer not implemented")
+}
+func (UnimplementedOtcServiceServer) InterbankGetNegotiation(context.Context, *InterbankNegotiationIdRequest) (*InterbankNegotiationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InterbankGetNegotiation not implemented")
+}
+func (UnimplementedOtcServiceServer) InterbankDeleteNegotiation(context.Context, *InterbankNegotiationIdRequest) (*OtcEmptyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InterbankDeleteNegotiation not implemented")
+}
+func (UnimplementedOtcServiceServer) InterbankAcceptNegotiation(context.Context, *InterbankNegotiationIdRequest) (*OtcEmptyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InterbankAcceptNegotiation not implemented")
 }
 func (UnimplementedOtcServiceServer) mustEmbedUnimplementedOtcServiceServer() {}
 func (UnimplementedOtcServiceServer) testEmbeddedByValue()                    {}
@@ -410,6 +492,96 @@ func _OtcService_GetMarket_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OtcService_CreateInterbankNegotiation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateInterbankNegotiationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).CreateInterbankNegotiation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_CreateInterbankNegotiation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).CreateInterbankNegotiation(ctx, req.(*CreateInterbankNegotiationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OtcService_InterbankCounterOffer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InterbankCounterOfferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).InterbankCounterOffer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_InterbankCounterOffer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).InterbankCounterOffer(ctx, req.(*InterbankCounterOfferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OtcService_InterbankGetNegotiation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InterbankNegotiationIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).InterbankGetNegotiation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_InterbankGetNegotiation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).InterbankGetNegotiation(ctx, req.(*InterbankNegotiationIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OtcService_InterbankDeleteNegotiation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InterbankNegotiationIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).InterbankDeleteNegotiation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_InterbankDeleteNegotiation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).InterbankDeleteNegotiation(ctx, req.(*InterbankNegotiationIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OtcService_InterbankAcceptNegotiation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InterbankNegotiationIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OtcServiceServer).InterbankAcceptNegotiation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OtcService_InterbankAcceptNegotiation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OtcServiceServer).InterbankAcceptNegotiation(ctx, req.(*InterbankNegotiationIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OtcService_ServiceDesc is the grpc.ServiceDesc for OtcService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -456,6 +628,26 @@ var OtcService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMarket",
 			Handler:    _OtcService_GetMarket_Handler,
+		},
+		{
+			MethodName: "CreateInterbankNegotiation",
+			Handler:    _OtcService_CreateInterbankNegotiation_Handler,
+		},
+		{
+			MethodName: "InterbankCounterOffer",
+			Handler:    _OtcService_InterbankCounterOffer_Handler,
+		},
+		{
+			MethodName: "InterbankGetNegotiation",
+			Handler:    _OtcService_InterbankGetNegotiation_Handler,
+		},
+		{
+			MethodName: "InterbankDeleteNegotiation",
+			Handler:    _OtcService_InterbankDeleteNegotiation_Handler,
+		},
+		{
+			MethodName: "InterbankAcceptNegotiation",
+			Handler:    _OtcService_InterbankAcceptNegotiation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
