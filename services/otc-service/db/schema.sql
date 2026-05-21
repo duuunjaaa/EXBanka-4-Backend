@@ -13,8 +13,24 @@ CREATE TABLE IF NOT EXISTS otc_negotiations (
     last_modified    TIMESTAMP      NOT NULL DEFAULT NOW(),
     modified_by_id   BIGINT,
     modified_by_type VARCHAR(10),
-    status           VARCHAR(20)    NOT NULL DEFAULT 'PENDING_SELLER'
+    status           VARCHAR(20)    NOT NULL DEFAULT 'PENDING_SELLER',
+    -- cross-bank negotiation fields (NULL for intra-bank negotiations)
+    buyer_routing_number   INTEGER,
+    buyer_external_id      VARCHAR(100),
+    seller_routing_number  INTEGER,
+    seller_external_id     VARCHAR(100),
+    creator_routing_number INTEGER,
+    creator_external_id    VARCHAR(100),
+    UNIQUE (creator_routing_number, creator_external_id)
 );
+
+-- Migration: add cross-bank columns if upgrading an existing deployment
+ALTER TABLE otc_negotiations ADD COLUMN IF NOT EXISTS buyer_routing_number   INTEGER;
+ALTER TABLE otc_negotiations ADD COLUMN IF NOT EXISTS buyer_external_id      VARCHAR(100);
+ALTER TABLE otc_negotiations ADD COLUMN IF NOT EXISTS seller_routing_number  INTEGER;
+ALTER TABLE otc_negotiations ADD COLUMN IF NOT EXISTS seller_external_id     VARCHAR(100);
+ALTER TABLE otc_negotiations ADD COLUMN IF NOT EXISTS creator_routing_number INTEGER;
+ALTER TABLE otc_negotiations ADD COLUMN IF NOT EXISTS creator_external_id    VARCHAR(100);
 
 CREATE TABLE IF NOT EXISTS otc_contracts (
     id               BIGSERIAL PRIMARY KEY,
