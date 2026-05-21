@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -487,5 +488,67 @@ func SetPublicMode(portfolioClient pb_portfolio.PortfolioServiceClient) gin.Hand
 			"ticker":   resp.Ticker,
 			"isPublic": resp.IsPublic,
 		})
+	}
+}
+
+func GetPublicStock(client pb.OtcServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKey := os.Getenv("OWN_INTERBANK_API_KEY")
+		if apiKey == "" || c.GetHeader("X-Api-Key") != apiKey {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+
+		routingNumber, _ := strconv.Atoi(os.Getenv("OWN_ROUTING_NUMBER"))
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+
+		resp, err := client.GetMarket(ctx, &pb.GetMarketRequest{
+			CallerId:   0,
+			CallerType: "CLIENT",
+		})
+		if err != nil {
+			mapOtcError(c, err)
+			return
+		}
+
+		type seller struct {
+			RoutingNumber int    `json:"routingNumber"`
+			ID            string `json:"id"`
+		}
+		type sellerEntry struct {
+			Seller seller `json:"seller"`
+			Amount int32  `json:"amount"`
+		}
+		type stock struct {
+			Ticker string `json:"ticker"`
+		}
+		type stockEntry struct {
+			Stock   stock         `json:"stock"`
+			Sellers []sellerEntry `json:"sellers"`
+		}
+
+		byTicker := make(map[string]*stockEntry)
+		for _, item := range resp.Items {
+			entry, ok := byTicker[item.Ticker]
+			if !ok {
+				entry = &stockEntry{Stock: stock{Ticker: item.Ticker}}
+				byTicker[item.Ticker] = entry
+			}
+			entry.Sellers = append(entry.Sellers, sellerEntry{
+				Seller: seller{
+					RoutingNumber: routingNumber,
+					ID:            strconv.FormatInt(item.OwnerId, 10),
+				},
+				Amount: item.Amount,
+			})
+		}
+
+		result := make([]*stockEntry, 0, len(byTicker))
+		for _, v := range byTicker {
+			result = append(result, v)
+		}
+		c.JSON(http.StatusOK, result)
 	}
 }

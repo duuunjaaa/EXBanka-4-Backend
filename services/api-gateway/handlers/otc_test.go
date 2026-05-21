@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	pb "github.com/RAF-SI-2025/EXBanka-4-Backend/shared/pb/otc"
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -587,5 +589,122 @@ func TestGetMarket_Empty(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp) != 0 {
 		t.Fatalf("expected empty array got %d", len(resp))
+	}
+}
+
+// ---- GetPublicStock tests ----
+
+func serveHandlerWithAPIKey(handler gin.HandlerFunc, method, path, urlPath, apiKey string) *httptest.ResponseRecorder {
+	router := gin.New()
+	router.Handle(method, path, handler)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(method, urlPath, nil)
+	if apiKey != "" {
+		req.Header.Set("X-Api-Key", apiKey)
+	}
+	router.ServeHTTP(w, req)
+	return w
+}
+
+func TestGetPublicStock_NoAPIKey(t *testing.T) {
+	t.Setenv("OWN_INTERBANK_API_KEY", "secret")
+	w := serveHandlerWithAPIKey(GetPublicStock(&stubOtcClient{}), "GET", "/public-stock", "/public-stock", "")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", w.Code)
+	}
+}
+
+func TestGetPublicStock_WrongAPIKey(t *testing.T) {
+	t.Setenv("OWN_INTERBANK_API_KEY", "secret")
+	w := serveHandlerWithAPIKey(GetPublicStock(&stubOtcClient{}), "GET", "/public-stock", "/public-stock", "wrong")
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", w.Code)
+	}
+}
+
+func TestGetPublicStock_Empty(t *testing.T) {
+	t.Setenv("OWN_INTERBANK_API_KEY", "secret")
+	t.Setenv("OWN_ROUTING_NUMBER", "123")
+	svc := &stubOtcClient{
+		getMarketFn: func(_ context.Context, _ *pb.GetMarketRequest, _ ...grpc.CallOption) (*pb.GetMarketResponse, error) {
+			return &pb.GetMarketResponse{Items: []*pb.MarketItem{}}, nil
+		},
+	}
+	w := serveHandlerWithAPIKey(GetPublicStock(svc), "GET", "/public-stock", "/public-stock", "secret")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+	var resp []interface{}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp) != 0 {
+		t.Fatalf("expected empty array got %d items", len(resp))
+	}
+}
+
+func TestGetPublicStock_GroupsByTicker(t *testing.T) {
+	t.Setenv("OWN_INTERBANK_API_KEY", "secret")
+	t.Setenv("OWN_ROUTING_NUMBER", "123")
+	svc := &stubOtcClient{
+		getMarketFn: func(_ context.Context, req *pb.GetMarketRequest, _ ...grpc.CallOption) (*pb.GetMarketResponse, error) {
+			// Verify caller identity passed to GetMarket
+			if req.CallerId != 0 || req.CallerType != "CLIENT" {
+				return nil, status.Error(codes.InvalidArgument, "unexpected caller")
+			}
+			return &pb.GetMarketResponse{Items: []*pb.MarketItem{
+				{Ticker: "AAPL", OwnerId: 1, Amount: 50},
+				{Ticker: "AAPL", OwnerId: 2, Amount: 30},
+				{Ticker: "MSFT", OwnerId: 3, Amount: 10},
+			}}, nil
+		},
+	}
+	w := serveHandlerWithAPIKey(GetPublicStock(svc), "GET", "/public-stock", "/public-stock", "secret")
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(resp) != 2 {
+		t.Fatalf("expected 2 ticker groups got %d", len(resp))
+	}
+
+	// Build a map for order-independent checks
+	byTicker := map[string][]interface{}{}
+	for _, entry := range resp {
+		stock := entry["stock"].(map[string]interface{})
+		ticker := stock["ticker"].(string)
+		byTicker[ticker] = entry["sellers"].([]interface{})
+	}
+
+	if len(byTicker["AAPL"]) != 2 {
+		t.Fatalf("expected 2 AAPL sellers got %d", len(byTicker["AAPL"]))
+	}
+	if len(byTicker["MSFT"]) != 1 {
+		t.Fatalf("expected 1 MSFT seller got %d", len(byTicker["MSFT"]))
+	}
+
+	// Check routing number is set correctly on a seller
+	msftSeller := byTicker["MSFT"][0].(map[string]interface{})
+	sellerInfo := msftSeller["seller"].(map[string]interface{})
+	if int(sellerInfo["routingNumber"].(float64)) != 123 {
+		t.Fatalf("expected routingNumber 123 got %v", sellerInfo["routingNumber"])
+	}
+	if sellerInfo["id"].(string) != "3" {
+		t.Fatalf("expected id '3' got %v", sellerInfo["id"])
+	}
+}
+
+func TestGetPublicStock_ServiceError(t *testing.T) {
+	t.Setenv("OWN_INTERBANK_API_KEY", "secret")
+	svc := &stubOtcClient{
+		getMarketFn: func(_ context.Context, _ *pb.GetMarketRequest, _ ...grpc.CallOption) (*pb.GetMarketResponse, error) {
+			return nil, status.Error(codes.Internal, "db error")
+		},
+	}
+	w := serveHandlerWithAPIKey(GetPublicStock(svc), "GET", "/public-stock", "/public-stock", "secret")
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 got %d", w.Code)
 	}
 }
