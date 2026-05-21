@@ -87,6 +87,15 @@ func (s *stubPaymentClient) GetTransfers(ctx context.Context, in *pb.GetTransfer
 	}
 	return nil, fmt.Errorf("not implemented")
 }
+func (s *stubPaymentClient) PrepareInterbankPayment(ctx context.Context, in *pb.PrepareInterbankPaymentRequest, opts ...grpc.CallOption) (*pb.PrepareInterbankPaymentResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubPaymentClient) CommitInterbankPayment(ctx context.Context, in *pb.CommitRollbackInterbankRequest, opts ...grpc.CallOption) (*pb.CommitRollbackInterbankResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (s *stubPaymentClient) RollbackInterbankPayment(ctx context.Context, in *pb.CommitRollbackInterbankRequest, opts ...grpc.CallOption) (*pb.CommitRollbackInterbankResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 // ---- CreatePayment ----
 

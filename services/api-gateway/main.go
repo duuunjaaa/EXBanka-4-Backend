@@ -123,6 +123,8 @@ func main() {
 
 	// Inter-bank 2PC endpoint — authenticated by X-Api-Key, no JWT
 	r.POST("/interbank", handlers.InterbankHandler(paymentClient))
+	// Public stock listing for partner banks — authenticated by X-Api-Key, no JWT
+	r.GET("/public-stock", handlers.GetPublicStock(otcClient))
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
